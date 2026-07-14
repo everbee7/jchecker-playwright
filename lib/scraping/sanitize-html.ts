@@ -1,0 +1,2 @@
+import sanitizeHtmlLibrary from "sanitize-html";
+export function sanitizeJobHtml(html:string):string{return sanitizeHtmlLibrary(html,{allowedTags:["p","br","ul","ol","li","strong","b","em","i","h1","h2","h3","h4","blockquote","a","code","pre"],allowedAttributes:{a:["href"]},allowedSchemes:["http","https","mailto"],transformTags:{a:(tag,attrs)=>({tagName:tag,attribs:{...attrs,rel:"noopener noreferrer",target:"_blank"}})}});}
