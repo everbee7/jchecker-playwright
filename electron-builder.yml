@@ -8,7 +8,6 @@ directories:
   output: dist-electron
 files:
   - desktop-dist/**/*
-  - desktop/config.html
   - .next/**/*
   - "!.next/cache/**/*"
   - app/**/*
@@ -16,7 +15,7 @@ files:
   - lib/**/*
   - types/**/*
   - package.json
-  - next.config.ts
+  - next.config.mjs
 extraResources:
   - from: desktop-browsers
     to: playwright-browsers

@@ -12,7 +12,8 @@
     "start": "next start",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
-    "desktop:compile": "tsc -p tsconfig.electron.json",
+    "desktop:clean": "node -e \"require('node:fs').rmSync('desktop-dist',{recursive:true,force:true})\"",
+    "desktop:compile": "npm run desktop:clean && tsc -p tsconfig.electron.json",
     "desktop:browsers": "node desktop/install-playwright-browsers.mjs",
     "desktop:run": "npm run build && npm run desktop:compile && electron .",
     "desktop:build": "npm run desktop:browsers && npm run build && npm run desktop:compile && electron-builder --win portable"
@@ -47,5 +48,6 @@
   },
   "allowScripts": {
     "electron@43.1.1": true
-  }
+  },
+  "packageManager": "yarn@4.3.1+sha512.af78262d7d125afbfeed740602ace8c5e4405cd7f4735c08feb327286b2fdb2390fbca01589bfd1f50b1240548b74806767f5a063c94b67e431aabd0d86f7774"
 }

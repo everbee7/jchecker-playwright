@@ -1,6 +1,5 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
+import { app, BrowserWindow, dialog, shell } from "electron";
 import dotenv from "dotenv";
-import { promises as fs } from "node:fs";
 import http, { type Server } from "node:http";
 import path from "node:path";
 import next from "next";
@@ -27,6 +26,7 @@ function loadRuntimeEnvironment(): void {
   ];
   for (const candidate of candidates)
     dotenv.config({ path: candidate, quiet: true });
+  process.env.MONGODB_URI ||= "mongodb://localhost:27017";
   process.env.MONGODB_DB_NAME ||= "jobchecker";
   Object.assign(process.env, { NODE_ENV: "production" });
   if (app.isPackaged) {
@@ -38,7 +38,6 @@ function loadRuntimeEnvironment(): void {
 }
 
 function createWindow(): BrowserWindow {
-  const preload = path.join(applicationRoot(), "desktop-dist", "preload.js");
   const browserWindow = new BrowserWindow({
     width: 1450,
     height: 920,
@@ -52,7 +51,6 @@ function createWindow(): BrowserWindow {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
-      preload,
     },
   });
   browserWindow.once("ready-to-show", () => browserWindow.show());
@@ -95,55 +93,9 @@ async function startNextServer(): Promise<string> {
 
 async function openApplication(): Promise<void> {
   window ??= createWindow();
-  if (!process.env.MONGODB_URI) {
-    await window.loadFile(
-      path.join(applicationRoot(), "desktop", "config.html"),
-    );
-    return;
-  }
   const url = await startNextServer();
   await window.loadURL(url);
 }
-
-ipcMain.handle("save-mongo-uri", async (_event, value: unknown) => {
-  try {
-    if (
-      typeof value !== "string" ||
-      value.includes("\n") ||
-      value.includes("\r")
-    ) {
-      throw new Error("Enter a valid MongoDB connection string.");
-    }
-    const uri = value.trim();
-    if (!/^mongodb(?:\+srv)?:\/\//i.test(uri)) {
-      throw new Error(
-        "The connection must begin with mongodb:// or mongodb+srv://.",
-      );
-    }
-    const configuration = `MONGODB_URI=${JSON.stringify(uri)}\nMONGODB_DB_NAME=jobchecker\n`;
-    await fs.writeFile(
-      path.join(app.getPath("userData"), "jobchecker.env"),
-      configuration,
-      {
-        encoding: "utf8",
-        mode: 0o600,
-      },
-    );
-    process.env.MONGODB_URI = uri;
-    process.env.MONGODB_DB_NAME = "jobchecker";
-    const url = await startNextServer();
-    await window?.loadURL(url);
-    return { ok: true };
-  } catch (error) {
-    return {
-      ok: false,
-      error:
-        error instanceof Error
-          ? error.message
-          : "Could not save configuration.",
-    };
-  }
-});
 
 if (!app.requestSingleInstanceLock()) app.quit();
 else {

@@ -66,7 +66,7 @@ npm run desktop:build
 
 The command creates `dist-electron/JobChecker-1.0.0-portable.exe`. It bundles the Next.js production application and a dedicated Playwright Chromium runtime, so no separate Node.js or browser installation is needed on the target Windows computer.
 
-On first launch, JobChecker asks for a MongoDB connection string. The value is stored in the current Windows user's Electron profile and is never embedded in the executable. You can alternatively place a `JobChecker.env` file beside the executable using `.env.example` as the template.
+The desktop app connects to `mongodb://localhost:27017` and uses the `jobchecker` database by default, so it opens directly without a setup prompt. To override either value, place a `JobChecker.env` file beside the executable using `.env.example` as the template.
 
 For local Electron development using the existing production build, run:
 
