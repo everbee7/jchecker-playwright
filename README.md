@@ -56,6 +56,26 @@ npm run build
 npm start
 ```
 
+## Windows desktop app
+
+Build a portable Windows executable with Electron:
+
+```bash
+npm run desktop:build
+```
+
+The command creates `dist-electron/JobChecker-1.0.0-portable.exe`. It bundles the Next.js production application and a dedicated Playwright Chromium runtime, so no separate Node.js or browser installation is needed on the target Windows computer.
+
+On first launch, JobChecker asks for a MongoDB connection string. The value is stored in the current Windows user's Electron profile and is never embedded in the executable. You can alternatively place a `JobChecker.env` file beside the executable using `.env.example` as the template.
+
+For local Electron development using the existing production build, run:
+
+```bash
+npm run desktop:run
+```
+
+The generated executable is unsigned, so Windows SmartScreen may show an unknown-publisher warning. Production distribution should use a Windows code-signing certificate.
+
 ## How analysis works
 
 `POST /api/jobs/check` creates an analysis run and processes normalized links with the configured concurrency (three by default). Each URL is saved in a processing state immediately. A normal HTTP request follows up to five validated redirects, caps response size, and enforces a timeout. The scraper then tries valid `JobPosting` JSON-LD, a domain adapter, and generic content selectors. If the description is still not useful, a reusable headless Chromium instance renders the page. Every result or failure is persisted independently, so one broken listing cannot abort the batch.
