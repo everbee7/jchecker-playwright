@@ -31,7 +31,17 @@ win:
     - target: portable
       arch:
         - x64
-  artifactName: JobChecker-${version}-portable.${ext}
+    - target: nsis
+      arch:
+        - x64
 portable:
   artifactName: JobChecker-${version}-portable.${ext}
   requestExecutionLevel: user
+nsis:
+  artifactName: JobChecker-${version}-setup.${ext}
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: JobChecker

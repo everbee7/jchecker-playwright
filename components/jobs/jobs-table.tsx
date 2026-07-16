@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import {
-  ExternalLink,
+  Copy,
   Eye,
   RefreshCw,
   Search,
@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/ui";
+import { copyToClipboard } from "@/lib/browser/copy-to-clipboard";
 interface Result {
   jobs: SerializedJob[];
   total: number;
@@ -453,6 +454,15 @@ function JobRow({
     current: SerializedJob["proposalStatus"],
   ) => void;
 }) {
+  const toast = useToast();
+  const copyJobLink = async () => {
+    try {
+      await copyToClipboard(job.finalUrl || job.url);
+      toast("Job link copied");
+    } catch {
+      toast("Could not copy the job link", "error");
+    }
+  };
   const tones = {
     strong: "green",
     good: "blue",
@@ -562,15 +572,15 @@ function JobRow({
           >
             <Eye className="h-4 w-4" />
           </Link>
-          <a
-            href={job.finalUrl || job.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Open original"
+          <button
+            type="button"
+            onClick={copyJobLink}
+            title="Copy job link"
+            aria-label="Copy job link"
             className="rounded-lg p-2 text-slate-500 hover:bg-white hover:text-brand-600"
           >
-            <ExternalLink className="h-4 w-4" />
-          </a>
+            <Copy className="h-4 w-4" />
+          </button>
           <button
             onClick={() => onRecheck(job._id)}
             title="Recheck"
