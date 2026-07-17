@@ -22,6 +22,7 @@ const technologyCatalogItemSchema = z.object({
   patterns: z.array(z.string().min(1).max(500)).max(10).optional(),
 });
 export const settingsSchema = z.object({
+  webAppUrl: z.string().trim().url().max(500).nullable().optional().default(null),
   wantedTechnologies: z.array(z.string().trim().min(1).max(60)).max(100),
   unwantedTechnologies: z.array(z.string().trim().min(1).max(60)).max(100),
   scrapingConcurrency: z.number().int().min(1).max(10),

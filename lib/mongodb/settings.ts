@@ -13,9 +13,9 @@ export async function getSettings(): Promise<AppSettings> {
         { _id: current._id },
         { $set: { technologyCatalog } },
       );
-      return { ...current, technologyCatalog };
+      return { ...current, webAppUrl: current.webAppUrl ?? null, technologyCatalog };
     }
-    return current;
+    return { ...current, webAppUrl: current.webAppUrl ?? null };
   }
   const value: AppSettings = {
     ...DEFAULT_SETTINGS,

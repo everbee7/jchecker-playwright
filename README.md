@@ -71,6 +71,10 @@ To build the optional single-file portable version instead, run `npm run desktop
 
 The desktop app connects to `mongodb://localhost:27017` and uses the `jobchecker` database by default, so it opens directly without a setup prompt. To override either value, place a `JobChecker.env` file beside the executable using `.env.example` as the template.
 
+Set the Vercel production address under **Settings → Hosted web app**. The sidebar's **Open Web** action then opens it in the default browser. You can alternatively provide `JOBCHECKER_WEB_URL` in `JobChecker.env`; on Vercel, the deployment URL is detected automatically.
+
+For a Vercel deployment, configure `MONGODB_URI` with a network-accessible MongoDB deployment such as MongoDB Atlas. `mongodb://localhost:27017` only works for the local desktop application and cannot be reached by Vercel.
+
 For local Electron development using the existing production build, run:
 
 ```bash
