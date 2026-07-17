@@ -18,6 +18,7 @@ import {
   Sparkles,
   Trash2,
   Trophy,
+  X,
 } from "lucide-react";
 import { InterviewForm } from "./interview-form";
 import { InterviewStatusBadge } from "./interview-status";
@@ -25,8 +26,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/components/ui/toast";
 import { copyToClipboard } from "@/lib/browser/copy-to-clipboard";
-import { INTERVIEW_STATUSES, INTERVIEW_TYPES, interviewLabel } from "@/lib/interviews/constants";
-import type { InterviewStatus, SerializedInterview } from "@/types/interview";
+import { CORE_INTERVIEW_STAGES, INTERVIEW_TYPES, interviewLabel, interviewStatusLabel } from "@/lib/interviews/constants";
+import type { InterviewPipelineStage, InterviewStageColor, InterviewStatus, SerializedInterview } from "@/types/interview";
 
 interface Result {
   interviews: SerializedInterview[];
@@ -56,6 +57,7 @@ export function InterviewsWorkspace({ initialJobId = null }: { initialJobId?: st
   const [view, setView] = useState<"board" | "list">("board");
   const [showForm, setShowForm] = useState(Boolean(initialJobId));
   const [editing, setEditing] = useState<SerializedInterview | null>(null);
+  const [stages, setStages] = useState<InterviewPipelineStage[]>(CORE_INTERVIEW_STAGES);
   const toast = useToast();
 
   const load = useCallback(async () => {
@@ -88,21 +90,40 @@ export function InterviewsWorkspace({ initialJobId = null }: { initialJobId?: st
     return () => clearTimeout(timer);
   }, [load]);
 
+  useEffect(() => {
+    void fetch("/api/interview-stages", { cache: "no-store" })
+      .then(async (response) => {
+        const data = (await response.json()) as { stages?: InterviewPipelineStage[]; error?: string };
+        if (!response.ok) throw new Error(data.error ?? "Could not load interview stages");
+        setStages(data.stages ?? CORE_INTERVIEW_STAGES);
+      })
+      .catch((error: Error) => toast(error.message, "error"));
+  }, [toast]);
+
   function resetPage(change: () => void) {
     setPage(1);
     change();
   }
 
   async function changeStatus(interview: SerializedInterview, next: InterviewStatus) {
-    const response = await fetch(`/api/interviews/${interview._id}`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ status: next }),
-    });
-    if (response.ok) {
-      toast(`Status changed to ${interviewLabel(next)}`);
-      void load();
-    } else toast("Could not update status", "error");
+    if (interview.status === next) return;
+    const changedAt = new Date().toISOString();
+    const optimistic = { ...interview, status: next, updatedAt: changedAt, statusHistory: [...interview.statusHistory, { status: next, changedAt }] };
+    setResult((current) => replaceInterview(current, optimistic, interview));
+    try {
+      const response = await fetch(`/api/interviews/${interview._id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ status: next }),
+      });
+      const saved = (await response.json()) as SerializedInterview & { error?: string };
+      if (!response.ok) throw new Error(saved.error ?? "Could not update status");
+      setResult((current) => replaceInterview(current, saved, optimistic));
+      toast(`Moved to ${interviewStatusLabel(next, stages)}`);
+    } catch (error) {
+      setResult((current) => replaceInterview(current, interview, optimistic));
+      toast(error instanceof Error ? error.message : "Could not update status", "error");
+    }
   }
 
   async function remove(interview: SerializedInterview) {
@@ -110,7 +131,7 @@ export function InterviewsWorkspace({ initialJobId = null }: { initialJobId?: st
     const response = await fetch(`/api/interviews/${interview._id}`, { method: "DELETE" });
     if (response.ok) {
       toast("Interview deleted");
-      void load();
+      setResult((current) => removeInterview(current, interview));
     } else toast("Could not delete interview", "error");
   }
 
@@ -129,6 +150,37 @@ export function InterviewsWorkspace({ initialJobId = null }: { initialJobId?: st
     setShowForm(false);
     setEditing(null);
   };
+
+  function saveInterview(saved: SerializedInterview) {
+    const previous = result.interviews.find((item) => item._id === saved._id);
+    setResult((current) => previous ? replaceInterview(current, saved, previous) : insertInterview(current, saved));
+    closeForm();
+    toast(previous ? "Interview updated" : "Interview recorded");
+  }
+
+  async function addStage(details: StageDetails) {
+    const response = await fetch("/api/interview-stages", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(details) });
+    const data = (await response.json()) as InterviewPipelineStage & { error?: string };
+    if (!response.ok) throw new Error(data.error ?? "Could not add stage");
+    setStages((current) => [...current, data]);
+    toast(`${data.label} stage added`);
+  }
+
+  async function updateStage(id: InterviewStatus, details: StageDetails) {
+    const response = await fetch("/api/interview-stages", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, ...details }) });
+    const data = (await response.json()) as InterviewPipelineStage & { error?: string };
+    if (!response.ok) throw new Error(data.error ?? "Could not rename stage");
+    setStages((current) => current.map((stage) => stage.id === id ? data : stage));
+    toast("Stage updated");
+  }
+
+  async function deleteStage(id: InterviewStatus) {
+    const response = await fetch(`/api/interview-stages?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+    const data = (await response.json()) as { error?: string };
+    if (!response.ok) throw new Error(data.error ?? "Could not delete stage");
+    setStages((current) => current.filter((stage) => stage.id !== id));
+    toast("Stage deleted");
+  }
 
   return (
     <div className="mx-auto max-w-[1700px] p-4 sm:p-6 lg:p-8">
@@ -160,7 +212,7 @@ export function InterviewsWorkspace({ initialJobId = null }: { initialJobId?: st
               ].map(([value, label]) => (
                 <button key={label} onClick={() => resetPage(() => { setScope(value); setStatus(""); })} className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${scope === value && status === "" ? "border-orange-400/40 bg-orange-500/15 text-orange-300" : "border-slate-200 text-slate-500 hover:bg-slate-100"}`}>{label}</button>
               ))}
-              {["preparing", "awaiting-feedback", "next-round", "offer"].map((value) => (
+              {["awaiting-feedback", "next-round", "offer", "failed"].map((value) => (
                 <button key={value} onClick={() => resetPage(() => { setScope(""); setStatus(status === value ? "" : value); })} className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${status === value ? "border-orange-400/40 bg-orange-500/15 text-orange-300" : "border-slate-200 text-slate-500 hover:bg-slate-100"}`}>{interviewLabel(value)}</button>
               ))}
             </div>
@@ -171,7 +223,7 @@ export function InterviewsWorkspace({ initialJobId = null }: { initialJobId?: st
           </div>
           <div className="mt-3 grid gap-2 md:grid-cols-[minmax(220px,1fr)_190px_190px_180px]">
             <label className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" /><input value={search} onChange={(event) => resetPage(() => setSearch(event.target.value))} className={`${control} pl-9`} placeholder="Search company, role, client, interviewer…" /></label>
-            <select value={status} onChange={(event) => resetPage(() => { setScope(""); setStatus(event.target.value); })} className={control}><option value="">Any status</option>{INTERVIEW_STATUSES.map((item) => <option value={item} key={item}>{interviewLabel(item)}</option>)}</select>
+            <select value={status} onChange={(event) => resetPage(() => { setScope(""); setStatus(event.target.value); })} className={control}><option value="">Any status</option>{stages.map((item) => <option value={item.id} key={item.id}>{item.label}</option>)}</select>
             <select value={type} onChange={(event) => resetPage(() => setType(event.target.value))} className={control}><option value="">Any interview type</option>{INTERVIEW_TYPES.map((item) => <option value={item} key={item}>{interviewLabel(item)}</option>)}</select>
             <select value={sort} onChange={(event) => resetPage(() => setSort(event.target.value))} className={control}><option value="scheduled:asc">Soonest first</option><option value="scheduled:desc">Latest scheduled</option><option value="updated:desc">Recently updated</option><option value="company:asc">Company A–Z</option></select>
           </div>
@@ -180,11 +232,14 @@ export function InterviewsWorkspace({ initialJobId = null }: { initialJobId?: st
         {view === "board" ? (
           <PipelineBoard
             interviews={result.interviews}
+            stages={stages}
             loading={loading}
             onStatus={changeStatus}
             onEdit={setEditing}
             onCopy={copyLink}
-            onAdd={() => setShowForm(true)}
+            onAddStage={addStage}
+            onUpdateStage={updateStage}
+            onDeleteStage={deleteStage}
           />
         ) : (
         <div className="scrollbar overflow-x-auto">
@@ -192,13 +247,13 @@ export function InterviewsWorkspace({ initialJobId = null }: { initialJobId?: st
             <thead className="sticky top-0 bg-[#182137] text-[11px] uppercase tracking-wide text-slate-500"><tr>{["Schedule", "Opportunity", "Type", "Round", "People / client", "Status", "Next steps", "Actions"].map((heading) => <th key={heading} className="px-4 py-3 font-semibold">{heading}</th>)}</tr></thead>
             <tbody className="divide-y divide-slate-200/70">
               {loading ? Array.from({ length: 5 }).map((_, index) => <tr key={index}>{Array.from({ length: 8 }).map((__, cell) => <td className="px-4 py-4" key={cell}><div className="skeleton h-5 rounded" /></td>)}</tr>) : result.interviews.map((interview) => (
-                <tr key={interview._id} className="group hover:bg-white/[.025]">
+                <tr key={interview._id} className={`group transition-colors hover:brightness-110 ${stageRowClass(stages.find((stage) => stage.id === interview.status)?.color)}`}>
                   <td className="whitespace-nowrap px-4 py-4"><div className="font-semibold text-ink">{formatDate(interview.scheduledAt)}</div><div className="mt-1 text-xs text-slate-500">{interview.durationMinutes ? `${interview.durationMinutes} min` : "Duration not set"}</div></td>
                   <td className="max-w-72 px-4 py-4"><Link href={`/interviews/${interview._id}`} className="block truncate font-bold text-ink hover:text-amber-300">{interview.role}</Link><div className="mt-1 truncate text-xs text-slate-500">{interview.company}{interview.position ? ` · ${interview.position}` : ""}</div></td>
                   <td className="px-4 py-4 text-sm text-slate-600">{interviewLabel(interview.type)}</td>
                   <td className="px-4 py-4 text-sm text-slate-500">{interview.roundNumber ? `#${interview.roundNumber}` : "—"}</td>
                   <td className="max-w-52 px-4 py-4"><div className="truncate text-sm text-slate-600">{interview.interviewers.join(", ") || "No interviewer saved"}</div><div className="mt-1 truncate text-xs text-slate-500">{interview.clientName ? `Client: ${interview.clientName}` : interview.recruiterName || "No client / recruiter"}</div></td>
-                  <td className="px-4 py-4"><select aria-label={`Status for ${interview.company}`} value={interview.status} onChange={(event) => void changeStatus(interview, event.target.value as InterviewStatus)} className="h-8 rounded-lg border border-slate-200 bg-[#182137] px-2 text-xs font-semibold"><option value={interview.status}>{interviewLabel(interview.status)}</option>{INTERVIEW_STATUSES.filter((item) => item !== interview.status).map((item) => <option value={item} key={item}>{interviewLabel(item)}</option>)}</select><div className="mt-1"><InterviewStatusBadge status={interview.status} /></div></td>
+                  <td className="px-4 py-4"><select aria-label={`Status for ${interview.company}`} value={interview.status} onChange={(event) => void changeStatus(interview, event.target.value as InterviewStatus)} className="h-8 rounded-lg border border-slate-200 bg-[#182137] px-2 text-xs font-semibold">{stages.map((item) => <option value={item.id} key={item.id}>{item.label}</option>)}</select><div className="mt-1"><InterviewStatusBadge status={interview.status} label={interviewStatusLabel(interview.status, stages)} /></div></td>
                   <td className="max-w-52 px-4 py-4 text-xs leading-5 text-slate-500"><p className="line-clamp-2">{interview.nextSteps || "No next steps recorded"}</p></td>
                   <td className="px-4 py-4"><div className="flex items-center gap-1"><Link href={`/interviews/${interview._id}`} title="View details" className={iconButton}><Eye className="h-4 w-4" /></Link><button onClick={() => void copyLink(interview)} title="Copy meeting or job link" className={iconButton}><ClipboardCopy className="h-4 w-4" /></button><button onClick={() => setEditing(interview)} title="Edit interview" className={iconButton}><Edit3 className="h-4 w-4" /></button><button onClick={() => void remove(interview)} title="Delete interview" className={`${iconButton} hover:text-red-300`}><Trash2 className="h-4 w-4" /></button></div></td>
                 </tr>
@@ -211,50 +266,60 @@ export function InterviewsWorkspace({ initialJobId = null }: { initialJobId?: st
         {view === "list" && result.pages > 1 && <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-xs text-slate-500"><span>{result.total} matching interviews</span><div className="flex items-center gap-2"><button disabled={page <= 1} onClick={() => setPage((value) => value - 1)} className={pager}><ChevronLeft className="h-4 w-4" /></button><span>Page {page} of {result.pages}</span><button disabled={page >= result.pages} onClick={() => setPage((value) => value + 1)} className={pager}><ChevronRight className="h-4 w-4" /></button></div></div>}
       </Card>
 
-      {(showForm || editing) && <InterviewForm interview={editing} initialJobId={editing ? null : initialJobId} onClose={closeForm} onSaved={() => { closeForm(); toast(editing ? "Interview updated" : "Interview recorded"); void load(); }} />}
+      {(showForm || editing) && <InterviewForm stages={stages} interview={editing} initialJobId={editing ? null : initialJobId} onClose={closeForm} onSaved={saveInterview} />}
     </div>
   );
 }
 
-const pipelineStages: Array<{
-  status: InterviewStatus;
-  caption: string;
-  accent: string;
-}> = [
-  { status: "scheduled", caption: "Interview booked", accent: "bg-blue-400" },
-  { status: "preparing", caption: "Getting ready", accent: "bg-amber-400" },
-  { status: "completed", caption: "Interview finished", accent: "bg-emerald-400" },
-  { status: "awaiting-feedback", caption: "Waiting on response", accent: "bg-violet-400" },
-  { status: "next-round", caption: "Moving forward", accent: "bg-cyan-400" },
-  { status: "offer", caption: "Offer received", accent: "bg-green-400" },
-  { status: "rejected", caption: "Closed — rejected", accent: "bg-red-400" },
-  { status: "cancelled", caption: "Closed — cancelled", accent: "bg-slate-400" },
-];
-
 const activeProgress: InterviewStatus[] = [
   "scheduled",
-  "preparing",
-  "completed",
   "awaiting-feedback",
   "next-round",
   "offer",
 ];
 
+interface StageDetails {
+  label: string;
+  description: string;
+  color: InterviewStageColor;
+}
+
+const stageColors: InterviewStageColor[] = ["blue", "violet", "cyan", "green", "slate", "red", "amber", "orange", "fuchsia", "teal"];
+const accentClasses: Record<InterviewStageColor, string> = {
+  blue: "bg-blue-400", violet: "bg-violet-400", cyan: "bg-cyan-400", green: "bg-green-400", slate: "bg-slate-400",
+  red: "bg-red-400", amber: "bg-amber-400", orange: "bg-orange-400", fuchsia: "bg-fuchsia-400", teal: "bg-teal-400",
+};
+const rowClasses: Record<InterviewStageColor, string> = {
+  blue: "bg-blue-500/[.08]", violet: "bg-violet-500/[.08]", cyan: "bg-cyan-500/[.08]", green: "bg-green-500/[.08]", slate: "bg-slate-500/[.08]",
+  red: "bg-red-500/[.08]", amber: "bg-amber-500/[.08]", orange: "bg-orange-500/[.08]", fuchsia: "bg-fuchsia-500/[.08]", teal: "bg-teal-500/[.08]",
+};
+
 function PipelineBoard({
   interviews,
+  stages,
   loading,
   onStatus,
   onEdit,
   onCopy,
-  onAdd,
+  onAddStage,
+  onUpdateStage,
+  onDeleteStage,
 }: {
   interviews: SerializedInterview[];
+  stages: InterviewPipelineStage[];
   loading: boolean;
   onStatus: (interview: SerializedInterview, status: InterviewStatus) => Promise<void>;
   onEdit: (interview: SerializedInterview) => void;
   onCopy: (interview: SerializedInterview) => Promise<void>;
-  onAdd: () => void;
+  onAddStage: (details: StageDetails) => Promise<void>;
+  onUpdateStage: (id: InterviewStatus, details: StageDetails) => Promise<void>;
+  onDeleteStage: (id: InterviewStatus) => Promise<void>;
 }) {
+  const [addingStage, setAddingStage] = useState(false);
+  const [stageName, setStageName] = useState("");
+  const [stageDescription, setStageDescription] = useState("");
+  const [stageColor, setStageColor] = useState<InterviewStageColor>("fuchsia");
+  const [savingStage, setSavingStage] = useState(false);
   function drop(event: DragEvent, status: InterviewStatus) {
     event.preventDefault();
     const interview = interviews.find(
@@ -263,47 +328,48 @@ function PipelineBoard({
     if (interview && interview.status !== status) void onStatus(interview, status);
   }
 
-  if (!loading && !interviews.length)
-    return (
-      <div className="px-6 py-16 text-center">
-        <Columns3 className="mx-auto h-10 w-10 text-slate-600" />
-        <h3 className="mt-3 font-bold">Your interview pipeline is empty</h3>
-        <p className="mt-1 text-sm text-slate-500">
-          Record an interview to begin tracking its progress.
-        </p>
-        <Button className="mt-4" onClick={onAdd}>
-          <Plus className="h-4 w-4" /> Record interview
-        </Button>
-      </div>
-    );
+  async function createStage() {
+    if (!stageName.trim()) return;
+    setSavingStage(true);
+    try {
+      await onAddStage({ label: stageName.trim(), description: stageDescription.trim(), color: stageColor });
+      setStageName("");
+      setStageDescription("");
+      setStageColor("fuchsia");
+      setAddingStage(false);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Could not add stage");
+    } finally {
+      setSavingStage(false);
+    }
+  }
 
   return (
     <div className="scrollbar overflow-x-auto p-4">
       <div className="flex min-w-max items-start gap-3">
-        {pipelineStages.map((stage) => {
-          const items = interviews.filter((item) => item.status === stage.status);
+        {stages.map((stage) => {
+          const items = interviews.filter((item) => item.status === stage.id);
           return (
             <section
-              key={stage.status}
+              key={stage.id}
               onDragOver={(event) => event.preventDefault()}
-              onDrop={(event) => drop(event, stage.status)}
-              className="w-[285px] shrink-0 rounded-xl border border-slate-200 bg-[#182137]/70 p-3"
+              onDrop={(event) => drop(event, stage.id)}
+              className="flex h-[min(680px,calc(100vh-22rem))] min-h-[390px] w-[285px] shrink-0 flex-col rounded-xl border border-slate-200 bg-[#182137]/70 p-3"
             >
-              <header className="mb-3 flex items-center justify-between">
+              <header className="mb-3 flex shrink-0 items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className={`h-2.5 w-2.5 rounded-full ${stage.accent}`} />
+                  <span className={`h-2.5 w-2.5 rounded-full ${accentClasses[stage.color]}`} />
                   <div>
-                    <h3 className="text-xs font-bold text-ink">
-                      {interviewLabel(stage.status)}
-                    </h3>
-                    <p className="text-[10px] text-slate-500">{stage.caption}</p>
+                    <h3 className="text-xs font-bold text-ink">{stage.label}</h3>
+                    <p className="max-w-[180px] truncate text-[10px] text-slate-500" title={stage.description}>{stage.description || "No description"}</p>
                   </div>
                 </div>
-                <span className="grid h-6 min-w-6 place-items-center rounded-md bg-slate-100 px-1.5 text-[11px] font-bold text-slate-600">
-                  {items.length}
-                </span>
+                <div className="flex items-center gap-1">
+                  <span className="grid h-6 min-w-6 place-items-center rounded-md bg-slate-100 px-1.5 text-[11px] font-bold text-slate-600">{items.length}</span>
+                  {stage.custom && <StageMenu stage={stage} onUpdate={onUpdateStage} onDelete={onDeleteStage} />}
+                </div>
               </header>
-              <div className="space-y-2.5">
+              <div className="scrollbar min-h-0 flex-1 space-y-2.5 overflow-y-auto pr-1">
                 {loading ? (
                   <><div className="skeleton h-40 rounded-lg" /><div className="skeleton h-32 rounded-lg" /></>
                 ) : items.length ? (
@@ -311,6 +377,7 @@ function PipelineBoard({
                     <PipelineCard
                       key={interview._id}
                       interview={interview}
+                      stages={stages}
                       onStatus={onStatus}
                       onEdit={onEdit}
                       onCopy={onCopy}
@@ -325,6 +392,19 @@ function PipelineBoard({
             </section>
           );
         })}
+        <section className="w-[285px] shrink-0 rounded-xl border border-dashed border-amber-400/30 bg-amber-500/[.04] p-3">
+          {addingStage ? (
+            <div>
+              <div className="flex items-center justify-between"><h3 className="text-xs font-bold text-amber-300">Add workflow step</h3><button onClick={() => { setAddingStage(false); setStageName(""); setStageDescription(""); }} className={iconButton}><X className="h-4 w-4" /></button></div>
+              <input autoFocus maxLength={60} value={stageName} onChange={(event) => setStageName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && stageName.trim()) void createStage(); if (event.key === "Escape") setAddingStage(false); }} className={`${control} mt-3`} placeholder="GitHub project" />
+              <input maxLength={120} value={stageDescription} onChange={(event) => setStageDescription(event.target.value)} className={`${control} mt-2`} placeholder="Description, e.g. Take-home project" />
+              <ColorPicker value={stageColor} onChange={setStageColor} />
+              <Button disabled={!stageName.trim() || savingStage} onClick={() => void createStage()} className="mt-2 w-full">{savingStage ? "Adding…" : "Add step"}</Button>
+            </div>
+          ) : (
+            <button onClick={() => setAddingStage(true)} className="flex w-full items-center justify-center gap-2 rounded-lg px-3 py-8 text-sm font-semibold text-amber-300 transition hover:bg-amber-500/10"><Plus className="h-4 w-4" />Add step</button>
+          )}
+        </section>
       </div>
     </div>
   );
@@ -332,11 +412,13 @@ function PipelineBoard({
 
 function PipelineCard({
   interview,
+  stages,
   onStatus,
   onEdit,
   onCopy,
 }: {
   interview: SerializedInterview;
+  stages: InterviewPipelineStage[];
   onStatus: (interview: SerializedInterview, status: InterviewStatus) => Promise<void>;
   onEdit: (interview: SerializedInterview) => void;
   onCopy: (interview: SerializedInterview) => Promise<void>;
@@ -362,7 +444,7 @@ function PipelineCard({
         {interview.roundNumber && <span className="shrink-0 rounded-md bg-slate-100 px-1.5 py-1 text-[10px] font-bold text-slate-600">R{interview.roundNumber}</span>}
       </div>
       <div className="mt-3 h-1 overflow-hidden rounded-full bg-slate-100">
-        <div className={`h-full rounded-full ${interview.status === "rejected" ? "bg-red-400" : interview.status === "cancelled" ? "bg-slate-400" : "bg-gradient-to-r from-amber-400 to-orange-500"}`} style={{ width: `${progress}%` }} />
+        <div className={`h-full rounded-full ${interview.status === "failed" ? "bg-red-400" : interview.status === "cancelled" ? "bg-slate-400" : "bg-gradient-to-r from-amber-400 to-orange-500"}`} style={{ width: `${progress}%` }} />
       </div>
       <div className="mt-3 space-y-1.5 text-[11px] text-slate-500">
         <p className="font-semibold text-slate-600">{formatDate(interview.scheduledAt)}</p>
@@ -377,7 +459,7 @@ function PipelineCard({
           onChange={(event) => void onStatus(interview, event.target.value as InterviewStatus)}
           className="h-8 min-w-0 flex-1 rounded-md border border-slate-200 bg-[#182137] px-2 text-[11px] font-semibold"
         >
-          {INTERVIEW_STATUSES.map((status) => <option key={status} value={status}>{interviewLabel(status)}</option>)}
+          {stages.map((stage) => <option key={stage.id} value={stage.id}>{stage.label}</option>)}
         </select>
         <button onClick={() => void onCopy(interview)} title="Copy link" className={iconButton}><ClipboardCopy className="h-3.5 w-3.5" /></button>
         <button onClick={() => onEdit(interview)} title="Edit" className={iconButton}><Edit3 className="h-3.5 w-3.5" /></button>
@@ -385,6 +467,73 @@ function PipelineCard({
       </div>
     </article>
   );
+}
+
+function StageMenu({ stage, onUpdate, onDelete }: {
+  stage: InterviewPipelineStage;
+  onUpdate: (id: InterviewStatus, details: StageDetails) => Promise<void>;
+  onDelete: (id: InterviewStatus) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [label, setLabel] = useState(stage.label);
+  const [description, setDescription] = useState(stage.description);
+  const [color, setColor] = useState<InterviewStageColor>(stage.color);
+  const [saving, setSaving] = useState(false);
+  async function save() {
+    if (!label.trim()) return;
+    setSaving(true);
+    try {
+      await onUpdate(stage.id, { label: label.trim(), description: description.trim(), color });
+      setEditing(false);
+    } catch (error) { alert(error instanceof Error ? error.message : "Could not update stage"); }
+    finally { setSaving(false); }
+  }
+  async function remove() {
+    if (!confirm(`Delete the “${stage.label}” step?`)) return;
+    try { await onDelete(stage.id); }
+    catch (error) { alert(error instanceof Error ? error.message : "Could not delete stage"); }
+  }
+  return <div className="flex"><button title="Edit step" onClick={() => setEditing(true)} className="grid h-6 w-6 place-items-center rounded text-slate-500 hover:bg-slate-100 hover:text-amber-300"><Edit3 className="h-3 w-3" /></button><button title="Delete step" onClick={() => void remove()} className="grid h-6 w-6 place-items-center rounded text-slate-500 hover:bg-red-500/10 hover:text-red-300"><Trash2 className="h-3 w-3" /></button>{editing && <div className="fixed inset-0 z-50 grid place-items-center bg-[#0b1020]/80 p-4 backdrop-blur-sm" onMouseDown={(event) => { if (event.target === event.currentTarget) setEditing(false); }}><div className="w-full max-w-md rounded-2xl border border-slate-200 bg-[#202a44] p-5 shadow-2xl"><div className="flex items-center justify-between"><div><h2 className="font-bold text-white">Edit workflow step</h2><p className="mt-1 text-xs text-slate-500">Update the title, description, and board color.</p></div><button onClick={() => setEditing(false)} className={iconButton}><X className="h-4 w-4" /></button></div><label className="mt-4 block text-xs font-semibold text-slate-500">Step name<input autoFocus maxLength={60} value={label} onChange={(event) => setLabel(event.target.value)} className={`${control} mt-1.5`} /></label><label className="mt-3 block text-xs font-semibold text-slate-500">Description<input maxLength={120} value={description} onChange={(event) => setDescription(event.target.value)} className={`${control} mt-1.5`} placeholder="What happens in this step?" /></label><ColorPicker value={color} onChange={setColor} /><div className="mt-5 flex justify-end gap-2"><Button variant="secondary" onClick={() => setEditing(false)}>Cancel</Button><Button disabled={!label.trim() || saving} onClick={() => void save()}>{saving ? "Saving…" : "Save step"}</Button></div></div></div>}</div>;
+}
+
+function ColorPicker({ value, onChange }: { value: InterviewStageColor; onChange: (color: InterviewStageColor) => void }) {
+  return <fieldset className="mt-3"><legend className="mb-2 text-xs font-semibold text-slate-500">Color</legend><div className="flex flex-wrap gap-2">{stageColors.map((color) => <button type="button" key={color} onClick={() => onChange(color)} title={interviewLabel(color)} aria-label={`${interviewLabel(color)} stage color`} aria-pressed={value === color} className={`h-7 w-7 rounded-full ${accentClasses[color]} ring-offset-2 ring-offset-[#202a44] transition ${value === color ? "ring-2 ring-white" : "opacity-60 hover:opacity-100"}`} />)}</div></fieldset>;
+}
+
+function stageRowClass(color: InterviewStageColor | undefined): string {
+  return color ? rowClasses[color] : "bg-white/[.02]";
+}
+
+function summaryValue(interview: SerializedInterview) {
+  const terminal = interview.status === "offer" || interview.status === "cancelled" || interview.status === "failed";
+  return {
+    upcoming: Boolean(interview.scheduledAt && new Date(interview.scheduledAt) >= new Date() && !terminal),
+    awaiting: interview.status === "awaiting-feedback",
+    offers: interview.status === "offer",
+  };
+}
+
+function adjustSummary(summary: Result["summary"], next: SerializedInterview | null, previous: SerializedInterview | null): Result["summary"] {
+  const before = previous ? summaryValue(previous) : { upcoming: false, awaiting: false, offers: false };
+  const after = next ? summaryValue(next) : { upcoming: false, awaiting: false, offers: false };
+  return {
+    total: summary.total + (next && !previous ? 1 : !next && previous ? -1 : 0),
+    upcoming: summary.upcoming + Number(after.upcoming) - Number(before.upcoming),
+    awaiting: summary.awaiting + Number(after.awaiting) - Number(before.awaiting),
+    offers: summary.offers + Number(after.offers) - Number(before.offers),
+  };
+}
+
+function replaceInterview(result: Result, next: SerializedInterview, previous: SerializedInterview): Result {
+  return { ...result, interviews: result.interviews.map((item) => item._id === next._id ? next : item), summary: adjustSummary(result.summary, next, previous) };
+}
+
+function insertInterview(result: Result, interview: SerializedInterview): Result {
+  return { ...result, interviews: [interview, ...result.interviews], total: result.total + 1, summary: adjustSummary(result.summary, interview, null) };
+}
+
+function removeInterview(result: Result, interview: SerializedInterview): Result {
+  return { ...result, interviews: result.interviews.filter((item) => item._id !== interview._id), total: Math.max(0, result.total - 1), summary: adjustSummary(result.summary, null, interview) };
 }
 
 const control = "h-10 w-full rounded-lg border border-slate-200 bg-[#182137] px-3 text-sm text-ink outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/15";

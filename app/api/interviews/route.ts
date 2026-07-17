@@ -5,8 +5,9 @@ import { ensureIndexes } from "@/lib/mongodb/indexes";
 import { interviewFields } from "@/lib/interviews/document";
 import { serializeInterview } from "@/lib/interviews/serialize";
 import { apiError, interviewInputSchema } from "@/lib/validation/schemas";
+import { assertInterviewStatus } from "@/lib/interviews/stages";
 
-const terminalStatuses = ["offer", "rejected", "cancelled"] as const;
+const terminalStatuses = ["offer", "cancelled", "failed"] as const;
 const sortFields: Record<string, keyof InterviewDocument> = {
   scheduled: "scheduledAt",
   updated: "updatedAt",
@@ -80,6 +81,7 @@ export async function POST(request: Request) {
   try {
     await ensureIndexes();
     const input = interviewInputSchema.parse(await request.json());
+    await assertInterviewStatus(input.status);
     const now = new Date();
     const document: InterviewDocument = {
       ...interviewFields(input),

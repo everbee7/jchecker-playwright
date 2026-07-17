@@ -8,6 +8,7 @@ import {
   interviewStatusSchema,
 } from "@/lib/validation/schemas";
 import { z } from "zod";
+import { assertInterviewStatus } from "@/lib/interviews/stages";
 
 async function idOf(params: Promise<{ id: string }>): Promise<ObjectId | null> {
   const { id } = await params;
@@ -39,6 +40,7 @@ export async function PUT(
     const id = await idOf(params);
     if (!id) return Response.json({ error: "Invalid interview ID" }, { status: 400 });
     const input = interviewInputSchema.parse(await request.json());
+    await assertInterviewStatus(input.status);
     const { interviews } = await collections();
     const current = await interviews.findOne({ _id: id });
     if (!current) return Response.json({ error: "Interview not found" }, { status: 404 });
@@ -76,6 +78,7 @@ export async function PATCH(
     const { status } = z
       .object({ status: interviewStatusSchema })
       .parse(await request.json());
+    await assertInterviewStatus(status);
     const now = new Date();
     const { interviews } = await collections();
     const current = await interviews.findOne({ _id: id });

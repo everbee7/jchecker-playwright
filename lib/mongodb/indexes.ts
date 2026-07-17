@@ -1,8 +1,26 @@
 import { collections } from "./collections";
+import type { Collection, Document } from "mongodb";
 let initialized: Promise<void> | null = null;
 export function ensureIndexes() {
   initialized ??= (async () => {
     const { jobs, runs, interviews } = await collections();
+    const legacyInterviews = interviews as unknown as Collection<Document>;
+    const legacyInterviewStatuses = [
+      ["preparing", "scheduled"],
+      ["completed", "awaiting-feedback"],
+      ["rejected", "failed"],
+    ] as const;
+    for (const [legacy, current] of legacyInterviewStatuses) {
+      await legacyInterviews.updateMany(
+        { status: legacy },
+        { $set: { status: current } },
+      );
+      await legacyInterviews.updateMany(
+        { "statusHistory.status": legacy },
+        { $set: { "statusHistory.$[event].status": current } },
+        { arrayFilters: [{ "event.status": legacy }] },
+      );
+    }
     await jobs.updateMany(
       { proposalStatus: { $exists: false } },
       { $set: { proposalStatus: "not-submitted", proposalSubmittedAt: null } },

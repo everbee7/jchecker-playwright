@@ -1,14 +1,34 @@
 import type { ObjectId } from "mongodb";
 
-export type InterviewStatus =
+export type CoreInterviewStatus =
   | "scheduled"
-  | "preparing"
-  | "completed"
   | "awaiting-feedback"
   | "next-round"
   | "offer"
-  | "rejected"
-  | "cancelled";
+  | "cancelled"
+  | "failed";
+
+export type CustomInterviewStatus = `custom-${string}`;
+export type InterviewStatus = CoreInterviewStatus | CustomInterviewStatus;
+export type InterviewStageColor =
+  | "blue"
+  | "violet"
+  | "cyan"
+  | "green"
+  | "slate"
+  | "red"
+  | "amber"
+  | "orange"
+  | "fuchsia"
+  | "teal";
+
+export interface InterviewPipelineStage {
+  id: InterviewStatus;
+  label: string;
+  description: string;
+  color: InterviewStageColor;
+  custom: boolean;
+}
 
 export type InterviewType =
   | "recruiter-screen"
