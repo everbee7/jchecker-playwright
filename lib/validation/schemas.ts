@@ -37,6 +37,62 @@ export const settingsSchema = z.object({
       "Technology names must be unique",
     ),
 });
+const nullableText = (max: number) =>
+  z.string().trim().max(max).nullable().optional().default(null);
+export const interviewStatusSchema = z.enum([
+  "scheduled",
+  "preparing",
+  "completed",
+  "awaiting-feedback",
+  "next-round",
+  "offer",
+  "rejected",
+  "cancelled",
+]);
+export const interviewTypeSchema = z.enum([
+  "recruiter-screen",
+  "phone-screen",
+  "technical",
+  "coding",
+  "system-design",
+  "behavioral",
+  "hiring-manager",
+  "panel",
+  "client",
+  "final",
+  "other",
+]);
+export const interviewInputSchema = z.object({
+  linkedJobId: nullableText(24).refine(
+    (value) => !value || /^[a-f\d]{24}$/i.test(value),
+    "Invalid linked job ID",
+  ),
+  jobUrl: z.string().trim().url().nullable().optional().default(null),
+  company: z.string().trim().min(1).max(150),
+  role: z.string().trim().min(1).max(180),
+  position: nullableText(120),
+  clientName: nullableText(150),
+  type: interviewTypeSchema,
+  status: interviewStatusSchema,
+  roundNumber: z.number().int().min(1).max(30).nullable().optional().default(null),
+  scheduledAt: z.string().datetime().nullable().optional().default(null),
+  timezone: nullableText(80),
+  durationMinutes: z.number().int().min(5).max(1440).nullable().optional().default(null),
+  location: nullableText(250),
+  meetingLink: z.string().trim().url().nullable().optional().default(null),
+  interviewers: z.array(z.string().trim().min(1).max(150)).max(30).default([]),
+  recruiterName: nullableText(150),
+  recruiterEmail: z.string().trim().email().nullable().optional().default(null),
+  recruiterPhone: nullableText(80),
+  employmentType: nullableText(100),
+  salaryRange: nullableText(120),
+  notes: z.string().max(20_000).default(""),
+  preparationNotes: z.string().max(20_000).default(""),
+  questionsToAsk: z.string().max(20_000).default(""),
+  followUpNotes: z.string().max(20_000).default(""),
+  outcomeNotes: z.string().max(20_000).default(""),
+  nextSteps: z.string().max(20_000).default(""),
+});
 export function apiError(error: unknown, status = 500) {
   if (error instanceof z.ZodError)
     return Response.json(

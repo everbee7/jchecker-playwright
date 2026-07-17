@@ -6,11 +6,13 @@ import {
   BriefcaseBusiness,
   Settings2,
   ScanSearch,
+  CalendarCheck2,
 } from "lucide-react";
 import { cn } from "@/lib/ui";
 const links = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/jobs", label: "Jobs", icon: BriefcaseBusiness },
+  { href: "/interviews", label: "Interviews", icon: CalendarCheck2 },
   { href: "/settings", label: "Settings", icon: Settings2 },
 ];
 export function Sidebar() {

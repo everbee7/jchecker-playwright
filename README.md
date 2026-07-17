@@ -14,6 +14,7 @@ JobChecker turns mixed chat exports and job-link lists into a ranked, searchable
 - MongoDB persistence with unique URL and query indexes
 - Live polling progress, searchable/filterable/sortable job table, detail tabs, retries, and deletion
 - Editable wanted/unwanted stacks and scraper settings
+- Interview pipeline with linked jobs, schedules, contacts, preparation, outcomes, status history, filters, and detailed records
 
 ## Stack
 
@@ -46,7 +47,7 @@ Next.js App Router, React, strict TypeScript, MongoDB's official Node.js driver,
    npm run dev
    ```
 
-Open `http://localhost:3000`. Collections and indexes are created on first use. The application uses `jobs`, `settings`, and `analysis_runs`.
+Open `http://localhost:3000`. Collections and indexes are created on first use. The application uses `jobs`, `settings`, `analysis_runs`, and `interviews`.
 
 For a production check and server:
 
@@ -111,6 +112,8 @@ Implement the `JobScraper` interface from `types/scraping.ts` in `lib/scraping/p
 - `POST /api/jobs/:id/recheck`
 - `GET /api/runs/:id`
 - `GET` / `PUT /api/settings`
+- `GET` / `POST /api/interviews`
+- `GET` / `PUT` / `PATCH` / `DELETE /api/interviews/:id`
 
 The jobs endpoint supports `search`, `matchLevel`, `technology`, `source`, `remoteStatus`, `scrapeStatus`, `hasUnwanted`, `sortBy`, `sortOrder`, `page`, and `limit`.
 

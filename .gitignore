@@ -8,3 +8,4 @@ desktop-dist
 desktop-browsers
 dist-electron
 dist-electron-portable
+.tmp-*.png

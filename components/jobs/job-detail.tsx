@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   AlertTriangle,
   Flag,
+  CalendarCheck2,
 } from "lucide-react";
 import type { SerializedJob, DetectedTechnology } from "@/types/job";
 import { Card } from "@/components/ui/card";
@@ -182,6 +183,13 @@ export function JobDetail({ id }: { id: string }) {
           </div>
         </div>
         <div className="flex gap-2">
+          <Link
+            href={`/interviews?jobId=${job._id}`}
+            className="inline-flex h-9 items-center gap-2 rounded-lg border border-amber-400/30 bg-amber-500/10 px-3.5 text-sm font-semibold text-amber-300 hover:bg-amber-500/20"
+          >
+            <CalendarCheck2 className="h-4 w-4" />
+            Record interview
+          </Link>
           <Button
             variant={
               job.proposalStatus === "submitted" ? "secondary" : "primary"
