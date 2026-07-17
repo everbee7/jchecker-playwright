@@ -1,0 +1,1 @@
+{"extends":["next/core-web-vitals","next/typescript"],"ignorePatterns":[".next/","node_modules/","next-env.d.ts","desktop-dist/","desktop-browsers/","dist-electron/"]}
