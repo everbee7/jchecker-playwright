@@ -14,6 +14,7 @@ JobChecker turns mixed chat exports and job-link lists into a ranked, searchable
 - MongoDB persistence with unique URL and query indexes
 - Live polling progress, searchable/filterable/sortable job table, detail tabs, retries, and deletion
 - Editable wanted/unwanted stacks and scraper settings
+- Interview pipeline with linked jobs, schedules, contacts, preparation, outcomes, status history, filters, and detailed records
 
 ## Stack
 
@@ -46,7 +47,7 @@ Next.js App Router, React, strict TypeScript, MongoDB's official Node.js driver,
    npm run dev
    ```
 
-Open `http://localhost:3000`. Collections and indexes are created on first use. The application uses `jobs`, `settings`, and `analysis_runs`.
+Open `http://localhost:3000`. Collections and indexes are created on first use. The application uses `jobs`, `settings`, `analysis_runs`, and `interviews`.
 
 For a production check and server:
 
@@ -55,6 +56,32 @@ npm run typecheck
 npm run build
 npm start
 ```
+
+## Windows desktop app
+
+Build a portable Windows executable with Electron:
+
+```bash
+npm run desktop:build
+```
+
+The command creates the guided installer `dist-electron/JobChecker-<version>-setup.exe`. It bundles the Next.js production application and a dedicated Playwright Chromium runtime, so no separate Node.js or browser installation is needed on the target Windows computer.
+
+To build the optional single-file portable version instead, run `npm run desktop:portable`. Its standard filename is `JobChecker-<version>-portable.exe`.
+
+The desktop app connects to `mongodb://localhost:27017` and uses the `jobchecker` database by default, so it opens directly without a setup prompt. To override either value, place a `JobChecker.env` file beside the executable using `.env.example` as the template.
+
+Set the Vercel production address under **Settings → Hosted web app**. The sidebar's **Open Web** action then opens it in the default browser. You can alternatively provide `JOBCHECKER_WEB_URL` in `JobChecker.env`; on Vercel, the deployment URL is detected automatically.
+
+For a Vercel deployment, configure `MONGODB_URI` with a network-accessible MongoDB deployment such as MongoDB Atlas. `mongodb://localhost:27017` only works for the local desktop application and cannot be reached by Vercel.
+
+For local Electron development using the existing production build, run:
+
+```bash
+npm run desktop:run
+```
+
+The generated executable is unsigned, so Windows SmartScreen may show an unknown-publisher warning. Production distribution should use a Windows code-signing certificate.
 
 ## How analysis works
 
@@ -89,6 +116,8 @@ Implement the `JobScraper` interface from `types/scraping.ts` in `lib/scraping/p
 - `POST /api/jobs/:id/recheck`
 - `GET /api/runs/:id`
 - `GET` / `PUT /api/settings`
+- `GET` / `POST /api/interviews`
+- `GET` / `PUT` / `PATCH` / `DELETE /api/interviews/:id`
 
 The jobs endpoint supports `search`, `matchLevel`, `technology`, `source`, `remoteStatus`, `scrapeStatus`, `hasUnwanted`, `sortBy`, `sortOrder`, `page`, and `limit`.
 

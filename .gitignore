@@ -4,3 +4,8 @@ node_modules
 playwright-report
 test-results
 *.tsbuildinfo
+desktop-dist
+desktop-browsers
+dist-electron
+dist-electron-portable
+.tmp-*.png

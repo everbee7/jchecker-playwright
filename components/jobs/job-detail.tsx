@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
+  Copy,
   ExternalLink,
   RefreshCw,
   Trash2,
@@ -14,6 +15,7 @@ import {
   ShieldCheck,
   AlertTriangle,
   Flag,
+  CalendarCheck2,
 } from "lucide-react";
 import type { SerializedJob, DetectedTechnology } from "@/types/job";
 import { Card } from "@/components/ui/card";
@@ -21,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/ui";
+import { copyToClipboard } from "@/lib/browser/copy-to-clipboard";
 const tabs = [
   "Overview",
   "Stack Analysis",
@@ -37,6 +40,15 @@ export function JobDetail({ id }: { id: string }) {
   const [flagBusy, setFlagBusy] = useState(false);
   const toast = useToast();
   const router = useRouter();
+  const copyJobLink = async () => {
+    if (!job) return;
+    try {
+      await copyToClipboard(job.finalUrl || job.url);
+      toast("Job link copied");
+    } catch {
+      toast("Could not copy the job link", "error");
+    }
+  };
   useEffect(() => {
     void (async () => {
       const response = await fetch(`/api/jobs/${id}`, { cache: "no-store" });
@@ -171,6 +183,13 @@ export function JobDetail({ id }: { id: string }) {
           </div>
         </div>
         <div className="flex gap-2">
+          <Link
+            href={`/interviews?jobId=${job._id}`}
+            className="inline-flex h-9 items-center gap-2 rounded-lg border border-amber-400/30 bg-amber-500/10 px-3.5 text-sm font-semibold text-amber-300 hover:bg-amber-500/20"
+          >
+            <CalendarCheck2 className="h-4 w-4" />
+            Record interview
+          </Link>
           <Button
             variant={
               job.proposalStatus === "submitted" ? "secondary" : "primary"
@@ -190,15 +209,10 @@ export function JobDetail({ id }: { id: string }) {
                 ? "Submitted"
                 : "Mark submitted"}
           </Button>
-          <a
-            href={job.finalUrl || job.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-          >
-            <ExternalLink className="h-4 w-4" />
-            Original
-          </a>
+          <Button variant="secondary" onClick={copyJobLink}>
+            <Copy className="h-4 w-4" />
+            Copy link
+          </Button>
           <Button variant="secondary" onClick={recheck} disabled={busy}>
             <RefreshCw className={cn("h-4 w-4", busy && "animate-spin")} />
             {busy ? "Checking…" : "Recheck"}

@@ -1,0 +1,47 @@
+appId: com.everbee7.jobchecker
+productName: JobChecker
+asar: false
+npmRebuild: false
+compression: normal
+electronDist: node_modules/electron/dist
+directories:
+  output: dist-electron
+files:
+  - desktop-dist/**/*
+  - .next/**/*
+  - "!.next/cache/**/*"
+  - app/**/*
+  - components/**/*
+  - lib/**/*
+  - types/**/*
+  - package.json
+  - next.config.mjs
+extraResources:
+  - from: desktop-browsers
+    to: playwright-browsers
+    filter:
+      - "**/*"
+      - "!chromium-*/**/*"
+extraFiles:
+  - from: .env.example
+    to: JobChecker.env.example
+win:
+  icon: desktop/icon.png
+  target:
+    - target: portable
+      arch:
+        - x64
+    - target: nsis
+      arch:
+        - x64
+portable:
+  artifactName: JobChecker-${version}-portable.${ext}
+  requestExecutionLevel: user
+nsis:
+  artifactName: JobChecker-${version}-setup.${ext}
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: JobChecker
