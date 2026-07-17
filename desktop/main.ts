@@ -1,5 +1,7 @@
 import { app, BrowserWindow, dialog, shell } from "electron";
 import dotenv from "dotenv";
+import dns from "node:dns";
+import net from "node:net";
 import http, { type Server } from "node:http";
 import path from "node:path";
 import next from "next";
@@ -18,14 +20,41 @@ function portableDirectory(): string {
 }
 
 function loadRuntimeEnvironment(): void {
-  const candidates = [
+  const bundledEnvironment = app.isPackaged
+    ? path.join(process.resourcesPath, "JobChecker.env")
+    : path.join(applicationRoot(), ".env");
+  dotenv.config({
+    path: bundledEnvironment,
+    quiet: true,
+    override: true,
+  });
+
+  const overrideCandidates = [
     path.join(portableDirectory(), "JobChecker.env"),
     path.join(portableDirectory(), ".env"),
     path.join(app.getPath("userData"), "jobchecker.env"),
-    path.join(applicationRoot(), ".env"),
   ];
-  for (const candidate of candidates)
-    dotenv.config({ path: candidate, quiet: true });
+  for (const candidate of overrideCandidates) {
+    if (path.resolve(candidate) !== path.resolve(bundledEnvironment)) {
+      dotenv.config({ path: candidate, quiet: true, override: true });
+    }
+  }
+  const currentDnsServers = dns.getServers();
+  const hasUsableDnsServer = currentDnsServers.some(
+    (server) => server !== "127.0.0.1" && server !== "::1",
+  );
+  if (!hasUsableDnsServer) {
+    const configuredDnsServers = (process.env.JOBCHECKER_DNS_SERVERS || "")
+      .split(",")
+      .map((server) => server.trim())
+      .filter((server) => net.isIP(server) !== 0);
+    if (configuredDnsServers.length) {
+      dns.setServers(configuredDnsServers);
+      console.log(
+        `[JobChecker] Replaced loopback DNS with ${configuredDnsServers.length} build-time resolver(s)`,
+      );
+    }
+  }
   process.env.MONGODB_URI ||= "mongodb://localhost:27017";
   process.env.MONGODB_DB_NAME ||= "jobchecker";
   Object.assign(process.env, { NODE_ENV: "production" });
@@ -97,7 +126,9 @@ async function openApplication(): Promise<void> {
   await window.loadURL(url);
 }
 
-if (!app.requestSingleInstanceLock()) app.quit();
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+console.log(`[JobChecker] main started; packaged=${app.isPackaged}; lock=${hasSingleInstanceLock}`);
+if (!hasSingleInstanceLock) app.quit();
 else {
   app.on("second-instance", () => {
     if (window) {
@@ -106,10 +137,17 @@ else {
     }
   });
   app.whenReady().then(async () => {
+    console.log("[JobChecker] Electron ready; loading runtime environment");
     loadRuntimeEnvironment();
     try {
+      console.log("[JobChecker] Starting local application server");
       await openApplication();
+      console.log(`[JobChecker] Application ready at ${applicationUrl}`);
     } catch (error) {
+      console.error(
+        "[JobChecker] Startup failed:",
+        error instanceof Error ? error.message : "Unknown startup error",
+      );
       await dialog.showMessageBox({
         type: "error",
         title: "JobChecker could not start",

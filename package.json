@@ -1,7 +1,7 @@
 {
   "name": "jobchecker",
   "productName": "JobChecker",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Desktop job-link analysis and technology matching dashboard",
   "author": "JobChecker contributors",
   "private": true,
@@ -13,7 +13,8 @@
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "desktop:clean": "node -e \"require('node:fs').rmSync('desktop-dist',{recursive:true,force:true})\"",
-    "desktop:compile": "npm run desktop:clean && tsc -p tsconfig.electron.json",
+    "desktop:prepare-env": "node desktop/prepare-runtime-env.mjs",
+    "desktop:compile": "npm run desktop:clean && npm run desktop:prepare-env && tsc -p tsconfig.electron.json",
     "desktop:browsers": "node desktop/install-playwright-browsers.mjs",
     "desktop:run": "npm run build && npm run desktop:compile && electron .",
     "desktop:build": "npm run desktop:browsers && npm run build && npm run desktop:compile && electron-builder --win nsis",

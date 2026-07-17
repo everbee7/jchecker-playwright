@@ -22,9 +22,8 @@ extraResources:
     filter:
       - "**/*"
       - "!chromium-*/**/*"
-extraFiles:
-  - from: .env.example
-    to: JobChecker.env.example
+  - from: desktop-runtime/JobChecker.env
+    to: JobChecker.env
 win:
   icon: desktop/icon.png
   target:
