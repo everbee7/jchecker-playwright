@@ -69,7 +69,9 @@ The command creates the guided installer `dist-electron/JobChecker-<version>-set
 
 To build the optional single-file portable version instead, run `npm run desktop:portable`. Its standard filename is `JobChecker-<version>-portable.exe`.
 
-The desktop app connects to `mongodb://localhost:27017` and uses the `jobchecker` database by default, so it opens directly without a setup prompt. To override either value, place a `JobChecker.env` file beside the executable using `.env.example` as the template.
+Desktop builds stage the required values from the local `.env` into an ignored runtime resource and load it before starting Next.js. This keeps credentials out of Git while allowing the packaged application to connect immediately. To override the bundled values after building, place a `JobChecker.env` file beside the executable using `.env.example` as the template.
+
+The staging step also records the build machine's working non-loopback DNS resolvers. Electron applies them only if its Node runtime reports loopback-only DNS, which keeps MongoDB Atlas `mongodb+srv` discovery working without changing normal system DNS behavior.
 
 Set the Vercel production address under **Settings → Hosted web app**. The sidebar's **Open Web** action then opens it in the default browser. You can alternatively provide `JOBCHECKER_WEB_URL` in `JobChecker.env`; on Vercel, the deployment URL is detected automatically.
 

@@ -1,4 +1,22 @@
 import { MongoClient } from "mongodb";
+import dns from "node:dns";
+import net from "node:net";
+
+function configureMongoDns(): void {
+  const hasUsableDnsServer = dns
+    .getServers()
+    .some((server) => server !== "127.0.0.1" && server !== "::1");
+  if (hasUsableDnsServer) return;
+
+  const configuredDnsServers = (process.env.JOBCHECKER_DNS_SERVERS || "")
+    .split(",")
+    .map((server) => server.trim())
+    .filter((server) => net.isIP(server) !== 0);
+  if (configuredDnsServers.length) dns.setServers(configuredDnsServers);
+}
+
+configureMongoDns();
+
 const uri = process.env.MONGODB_URI;
 if (!uri)
   console.warn(
