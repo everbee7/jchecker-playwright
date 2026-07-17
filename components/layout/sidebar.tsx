@@ -9,6 +9,7 @@ import {
   CalendarCheck2,
 } from "lucide-react";
 import { cn } from "@/lib/ui";
+import packageInfo from "@/package.json";
 import { OpenWebLink } from "./open-web-link";
 const links = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -25,7 +26,12 @@ export function Sidebar() {
           <ScanSearch className="h-5 w-5" />
         </span>
         <div>
-          <div className="font-bold tracking-tight">JobChecker</div>
+          <div className="flex items-center gap-2">
+            <div className="font-bold tracking-tight">JobChecker</div>
+            <span className="rounded border border-amber-400/20 bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-amber-300">
+              v{packageInfo.version}
+            </span>
+          </div>
           <div className="text-[10px] uppercase tracking-[.18em] text-slate-400">
             Stack intelligence
           </div>
