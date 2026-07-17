@@ -1,7 +1,7 @@
 {
   "name": "jobchecker",
   "productName": "JobChecker",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Desktop job-link analysis and technology matching dashboard",
   "author": "JobChecker contributors",
   "private": true,

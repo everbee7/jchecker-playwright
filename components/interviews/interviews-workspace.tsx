@@ -1,16 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type DragEvent } from "react";
 import {
   CalendarCheck2,
   CalendarClock,
   ChevronLeft,
   ChevronRight,
+  Columns3,
   ClipboardCopy,
   Clock3,
   Edit3,
   Eye,
+  List,
   Plus,
   Search,
   Sparkles,
@@ -51,6 +53,7 @@ export function InterviewsWorkspace({ initialJobId = null }: { initialJobId?: st
   const [scope, setScope] = useState("");
   const [sort, setSort] = useState("scheduled:asc");
   const [page, setPage] = useState(1);
+  const [view, setView] = useState<"board" | "list">("board");
   const [showForm, setShowForm] = useState(Boolean(initialJobId));
   const [editing, setEditing] = useState<SerializedInterview | null>(null);
   const toast = useToast();
@@ -60,7 +63,7 @@ export function InterviewsWorkspace({ initialJobId = null }: { initialJobId?: st
     const [sortBy, sortOrder] = sort.split(":");
     const query = new URLSearchParams({
       page: String(page),
-      limit: "30",
+      limit: view === "board" ? "100" : "30",
       sortBy,
       sortOrder,
     });
@@ -78,7 +81,7 @@ export function InterviewsWorkspace({ initialJobId = null }: { initialJobId?: st
     } finally {
       setLoading(false);
     }
-  }, [page, scope, search, sort, status, toast, type]);
+  }, [page, scope, search, sort, status, toast, type, view]);
 
   useEffect(() => {
     const timer = setTimeout(() => void load(), 200);
@@ -149,16 +152,22 @@ export function InterviewsWorkspace({ initialJobId = null }: { initialJobId?: st
 
       <Card className="overflow-hidden">
         <div className="border-b border-slate-200 p-4">
-          <div className="flex flex-wrap gap-2">
-            {[
-              ["", "All"],
-              ["upcoming", "Upcoming"],
-            ].map(([value, label]) => (
-              <button key={label} onClick={() => resetPage(() => setScope(value))} className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${scope === value ? "border-orange-400/40 bg-orange-500/15 text-orange-300" : "border-slate-200 text-slate-500 hover:bg-slate-100"}`}>{label}</button>
-            ))}
-            {["preparing", "awaiting-feedback", "next-round", "offer"].map((value) => (
-              <button key={value} onClick={() => resetPage(() => { setScope(""); setStatus(status === value ? "" : value); })} className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${status === value ? "border-orange-400/40 bg-orange-500/15 text-orange-300" : "border-slate-200 text-slate-500 hover:bg-slate-100"}`}>{interviewLabel(value)}</button>
-            ))}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap gap-2">
+              {[
+                ["", "All"],
+                ["upcoming", "Upcoming"],
+              ].map(([value, label]) => (
+                <button key={label} onClick={() => resetPage(() => { setScope(value); setStatus(""); })} className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${scope === value && status === "" ? "border-orange-400/40 bg-orange-500/15 text-orange-300" : "border-slate-200 text-slate-500 hover:bg-slate-100"}`}>{label}</button>
+              ))}
+              {["preparing", "awaiting-feedback", "next-round", "offer"].map((value) => (
+                <button key={value} onClick={() => resetPage(() => { setScope(""); setStatus(status === value ? "" : value); })} className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${status === value ? "border-orange-400/40 bg-orange-500/15 text-orange-300" : "border-slate-200 text-slate-500 hover:bg-slate-100"}`}>{interviewLabel(value)}</button>
+              ))}
+            </div>
+            <div className="flex rounded-lg border border-slate-200 bg-[#182137] p-1">
+              <button onClick={() => { setView("board"); setPage(1); }} className={`flex h-8 items-center gap-2 rounded-md px-3 text-xs font-semibold transition ${view === "board" ? "bg-orange-500 text-white" : "text-slate-500 hover:text-white"}`}><Columns3 className="h-3.5 w-3.5" />Board</button>
+              <button onClick={() => { setView("list"); setPage(1); }} className={`flex h-8 items-center gap-2 rounded-md px-3 text-xs font-semibold transition ${view === "list" ? "bg-orange-500 text-white" : "text-slate-500 hover:text-white"}`}><List className="h-3.5 w-3.5" />List</button>
+            </div>
           </div>
           <div className="mt-3 grid gap-2 md:grid-cols-[minmax(220px,1fr)_190px_190px_180px]">
             <label className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" /><input value={search} onChange={(event) => resetPage(() => setSearch(event.target.value))} className={`${control} pl-9`} placeholder="Search company, role, client, interviewer…" /></label>
@@ -168,6 +177,16 @@ export function InterviewsWorkspace({ initialJobId = null }: { initialJobId?: st
           </div>
         </div>
 
+        {view === "board" ? (
+          <PipelineBoard
+            interviews={result.interviews}
+            loading={loading}
+            onStatus={changeStatus}
+            onEdit={setEditing}
+            onCopy={copyLink}
+            onAdd={() => setShowForm(true)}
+          />
+        ) : (
         <div className="scrollbar overflow-x-auto">
           <table className="min-w-[1180px] w-full text-left">
             <thead className="sticky top-0 bg-[#182137] text-[11px] uppercase tracking-wide text-slate-500"><tr>{["Schedule", "Opportunity", "Type", "Round", "People / client", "Status", "Next steps", "Actions"].map((heading) => <th key={heading} className="px-4 py-3 font-semibold">{heading}</th>)}</tr></thead>
@@ -188,11 +207,183 @@ export function InterviewsWorkspace({ initialJobId = null }: { initialJobId?: st
           </table>
           {!loading && !result.interviews.length && <div className="px-6 py-16 text-center"><CalendarClock className="mx-auto h-10 w-10 text-slate-600" /><h3 className="mt-3 font-bold">No interviews found</h3><p className="mt-1 text-sm text-slate-500">Record your first interview or change the current filters.</p><Button className="mt-4" onClick={() => setShowForm(true)}><Plus className="h-4 w-4" />Record interview</Button></div>}
         </div>
-        {result.pages > 1 && <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-xs text-slate-500"><span>{result.total} matching interviews</span><div className="flex items-center gap-2"><button disabled={page <= 1} onClick={() => setPage((value) => value - 1)} className={pager}><ChevronLeft className="h-4 w-4" /></button><span>Page {page} of {result.pages}</span><button disabled={page >= result.pages} onClick={() => setPage((value) => value + 1)} className={pager}><ChevronRight className="h-4 w-4" /></button></div></div>}
+        )}
+        {view === "list" && result.pages > 1 && <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-xs text-slate-500"><span>{result.total} matching interviews</span><div className="flex items-center gap-2"><button disabled={page <= 1} onClick={() => setPage((value) => value - 1)} className={pager}><ChevronLeft className="h-4 w-4" /></button><span>Page {page} of {result.pages}</span><button disabled={page >= result.pages} onClick={() => setPage((value) => value + 1)} className={pager}><ChevronRight className="h-4 w-4" /></button></div></div>}
       </Card>
 
       {(showForm || editing) && <InterviewForm interview={editing} initialJobId={editing ? null : initialJobId} onClose={closeForm} onSaved={() => { closeForm(); toast(editing ? "Interview updated" : "Interview recorded"); void load(); }} />}
     </div>
+  );
+}
+
+const pipelineStages: Array<{
+  status: InterviewStatus;
+  caption: string;
+  accent: string;
+}> = [
+  { status: "scheduled", caption: "Interview booked", accent: "bg-blue-400" },
+  { status: "preparing", caption: "Getting ready", accent: "bg-amber-400" },
+  { status: "completed", caption: "Interview finished", accent: "bg-emerald-400" },
+  { status: "awaiting-feedback", caption: "Waiting on response", accent: "bg-violet-400" },
+  { status: "next-round", caption: "Moving forward", accent: "bg-cyan-400" },
+  { status: "offer", caption: "Offer received", accent: "bg-green-400" },
+  { status: "rejected", caption: "Closed — rejected", accent: "bg-red-400" },
+  { status: "cancelled", caption: "Closed — cancelled", accent: "bg-slate-400" },
+];
+
+const activeProgress: InterviewStatus[] = [
+  "scheduled",
+  "preparing",
+  "completed",
+  "awaiting-feedback",
+  "next-round",
+  "offer",
+];
+
+function PipelineBoard({
+  interviews,
+  loading,
+  onStatus,
+  onEdit,
+  onCopy,
+  onAdd,
+}: {
+  interviews: SerializedInterview[];
+  loading: boolean;
+  onStatus: (interview: SerializedInterview, status: InterviewStatus) => Promise<void>;
+  onEdit: (interview: SerializedInterview) => void;
+  onCopy: (interview: SerializedInterview) => Promise<void>;
+  onAdd: () => void;
+}) {
+  function drop(event: DragEvent, status: InterviewStatus) {
+    event.preventDefault();
+    const interview = interviews.find(
+      (item) => item._id === event.dataTransfer.getData("text/interview-id"),
+    );
+    if (interview && interview.status !== status) void onStatus(interview, status);
+  }
+
+  if (!loading && !interviews.length)
+    return (
+      <div className="px-6 py-16 text-center">
+        <Columns3 className="mx-auto h-10 w-10 text-slate-600" />
+        <h3 className="mt-3 font-bold">Your interview pipeline is empty</h3>
+        <p className="mt-1 text-sm text-slate-500">
+          Record an interview to begin tracking its progress.
+        </p>
+        <Button className="mt-4" onClick={onAdd}>
+          <Plus className="h-4 w-4" /> Record interview
+        </Button>
+      </div>
+    );
+
+  return (
+    <div className="scrollbar overflow-x-auto p-4">
+      <div className="flex min-w-max items-start gap-3">
+        {pipelineStages.map((stage) => {
+          const items = interviews.filter((item) => item.status === stage.status);
+          return (
+            <section
+              key={stage.status}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => drop(event, stage.status)}
+              className="w-[285px] shrink-0 rounded-xl border border-slate-200 bg-[#182137]/70 p-3"
+            >
+              <header className="mb-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className={`h-2.5 w-2.5 rounded-full ${stage.accent}`} />
+                  <div>
+                    <h3 className="text-xs font-bold text-ink">
+                      {interviewLabel(stage.status)}
+                    </h3>
+                    <p className="text-[10px] text-slate-500">{stage.caption}</p>
+                  </div>
+                </div>
+                <span className="grid h-6 min-w-6 place-items-center rounded-md bg-slate-100 px-1.5 text-[11px] font-bold text-slate-600">
+                  {items.length}
+                </span>
+              </header>
+              <div className="space-y-2.5">
+                {loading ? (
+                  <><div className="skeleton h-40 rounded-lg" /><div className="skeleton h-32 rounded-lg" /></>
+                ) : items.length ? (
+                  items.map((interview) => (
+                    <PipelineCard
+                      key={interview._id}
+                      interview={interview}
+                      onStatus={onStatus}
+                      onEdit={onEdit}
+                      onCopy={onCopy}
+                    />
+                  ))
+                ) : (
+                  <div className="rounded-lg border border-dashed border-slate-200 px-3 py-8 text-center text-xs text-slate-500">
+                    Drop an interview here
+                  </div>
+                )}
+              </div>
+            </section>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function PipelineCard({
+  interview,
+  onStatus,
+  onEdit,
+  onCopy,
+}: {
+  interview: SerializedInterview;
+  onStatus: (interview: SerializedInterview, status: InterviewStatus) => Promise<void>;
+  onEdit: (interview: SerializedInterview) => void;
+  onCopy: (interview: SerializedInterview) => Promise<void>;
+}) {
+  const progressIndex = activeProgress.indexOf(interview.status);
+  const progress = progressIndex < 0 ? 100 : ((progressIndex + 1) / activeProgress.length) * 100;
+  return (
+    <article
+      draggable
+      onDragStart={(event) => {
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/interview-id", interview._id);
+      }}
+      className="cursor-grab rounded-lg border border-slate-200 bg-[#202a44] p-3.5 shadow-lg shadow-black/10 active:cursor-grabbing"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <Link href={`/interviews/${interview._id}`} className="block truncate text-sm font-bold text-ink hover:text-amber-300">
+            {interview.role}
+          </Link>
+          <p className="mt-0.5 truncate text-xs font-medium text-slate-500">{interview.company}</p>
+        </div>
+        {interview.roundNumber && <span className="shrink-0 rounded-md bg-slate-100 px-1.5 py-1 text-[10px] font-bold text-slate-600">R{interview.roundNumber}</span>}
+      </div>
+      <div className="mt-3 h-1 overflow-hidden rounded-full bg-slate-100">
+        <div className={`h-full rounded-full ${interview.status === "rejected" ? "bg-red-400" : interview.status === "cancelled" ? "bg-slate-400" : "bg-gradient-to-r from-amber-400 to-orange-500"}`} style={{ width: `${progress}%` }} />
+      </div>
+      <div className="mt-3 space-y-1.5 text-[11px] text-slate-500">
+        <p className="font-semibold text-slate-600">{formatDate(interview.scheduledAt)}</p>
+        <p>{interviewLabel(interview.type)}{interview.durationMinutes ? ` · ${interview.durationMinutes} min` : ""}</p>
+        {(interview.clientName || interview.interviewers.length > 0) && <p className="truncate">{interview.clientName ? `Client: ${interview.clientName}` : interview.interviewers.join(", ")}</p>}
+      </div>
+      {interview.nextSteps && <p className="mt-3 line-clamp-2 rounded-md border border-amber-400/15 bg-amber-500/[.06] px-2 py-1.5 text-[11px] leading-4 text-slate-600">{interview.nextSteps}</p>}
+      <div className="mt-3 flex items-center gap-1.5 border-t border-slate-200 pt-3">
+        <select
+          aria-label={`Move ${interview.company} interview`}
+          value={interview.status}
+          onChange={(event) => void onStatus(interview, event.target.value as InterviewStatus)}
+          className="h-8 min-w-0 flex-1 rounded-md border border-slate-200 bg-[#182137] px-2 text-[11px] font-semibold"
+        >
+          {INTERVIEW_STATUSES.map((status) => <option key={status} value={status}>{interviewLabel(status)}</option>)}
+        </select>
+        <button onClick={() => void onCopy(interview)} title="Copy link" className={iconButton}><ClipboardCopy className="h-3.5 w-3.5" /></button>
+        <button onClick={() => onEdit(interview)} title="Edit" className={iconButton}><Edit3 className="h-3.5 w-3.5" /></button>
+        <Link href={`/interviews/${interview._id}`} title="Open details" className={iconButton}><Eye className="h-3.5 w-3.5" /></Link>
+      </div>
+    </article>
   );
 }
 
