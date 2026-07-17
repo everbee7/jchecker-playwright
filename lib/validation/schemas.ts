@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { InterviewStatus } from "@/types/interview";
 export const extractLinksSchema = z.object({ text: z.string().max(1_000_000) });
 export const checkJobsSchema = z.object({
   links: z.array(z.string().url()).min(1).max(500),
@@ -21,6 +22,13 @@ const technologyCatalogItemSchema = z.object({
   aliases: z.array(z.string().trim().min(1).max(100)).max(30),
   patterns: z.array(z.string().min(1).max(500)).max(10).optional(),
 });
+const interviewPipelineStageSchema = z.object({
+  id: z.string().regex(/^custom-[a-z0-9][a-z0-9-]{0,79}$/).transform((value) => value as InterviewStatus),
+  label: z.string().trim().min(1).max(60),
+  description: z.string().trim().max(120).default("Custom workflow step"),
+  color: z.enum(["blue", "violet", "cyan", "green", "slate", "red", "amber", "orange", "fuchsia", "teal"]).default("fuchsia"),
+  custom: z.literal(true),
+});
 export const settingsSchema = z.object({
   webAppUrl: z.string().trim().url().max(500).nullable().optional().default(null),
   wantedTechnologies: z.array(z.string().trim().min(1).max(60)).max(100),
@@ -37,19 +45,14 @@ export const settingsSchema = z.object({
         items.length,
       "Technology names must be unique",
     ),
+  interviewCustomStages: z.array(interviewPipelineStageSchema).max(20).optional().default([]),
 });
 const nullableText = (max: number) =>
   z.string().trim().max(max).nullable().optional().default(null);
-export const interviewStatusSchema = z.enum([
-  "scheduled",
-  "preparing",
-  "completed",
-  "awaiting-feedback",
-  "next-round",
-  "offer",
-  "rejected",
-  "cancelled",
-]);
+export const interviewStatusSchema = z.union([
+  z.enum(["scheduled", "awaiting-feedback", "next-round", "offer", "cancelled", "failed"]),
+  z.string().regex(/^custom-[a-z0-9][a-z0-9-]{0,79}$/),
+]).transform((value) => value as InterviewStatus);
 export const interviewTypeSchema = z.enum([
   "recruiter-screen",
   "phone-screen",

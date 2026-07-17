@@ -32,6 +32,7 @@ export const DEFAULT_SETTINGS = {
   scrapingConcurrency: 3,
   requestTimeoutMs: 15000,
   technologyCatalog: DEFAULT_TECHNOLOGY_CATALOG,
+  interviewCustomStages: [],
 };
 export const MAX_DESCRIPTION_LENGTH = 250_000;
 export const MAX_RESPONSE_BYTES = 5_000_000;

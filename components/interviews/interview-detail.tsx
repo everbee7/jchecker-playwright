@@ -22,13 +22,14 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/components/ui/toast";
 import { copyToClipboard } from "@/lib/browser/copy-to-clipboard";
-import { INTERVIEW_STATUSES, interviewLabel } from "@/lib/interviews/constants";
-import type { InterviewStatus, SerializedInterview } from "@/types/interview";
+import { CORE_INTERVIEW_STAGES, interviewLabel, interviewStatusLabel } from "@/lib/interviews/constants";
+import type { InterviewPipelineStage, InterviewStatus, SerializedInterview } from "@/types/interview";
 
 export function InterviewDetail({ id }: { id: string }) {
   const [interview, setInterview] = useState<SerializedInterview | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
+  const [stages, setStages] = useState<InterviewPipelineStage[]>(CORE_INTERVIEW_STAGES);
   const toast = useToast();
   const router = useRouter();
 
@@ -43,6 +44,12 @@ export function InterviewDetail({ id }: { id: string }) {
       .finally(() => setLoading(false));
   }, [id, toast]);
 
+  useEffect(() => {
+    void fetch("/api/interview-stages", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((data: { stages?: InterviewPipelineStage[] }) => setStages(data.stages ?? CORE_INTERVIEW_STAGES));
+  }, []);
+
   async function updateStatus(status: InterviewStatus) {
     if (!interview) return;
     const response = await fetch(`/api/interviews/${id}`, {
@@ -53,7 +60,7 @@ export function InterviewDetail({ id }: { id: string }) {
     const data = (await response.json()) as SerializedInterview & { error?: string };
     if (response.ok) {
       setInterview(data);
-      toast(`Status changed to ${interviewLabel(status)}`);
+      toast(`Status changed to ${interviewStatusLabel(status, stages)}`);
     } else toast(data.error ?? "Could not update status", "error");
   }
 
@@ -85,11 +92,11 @@ export function InterviewDetail({ id }: { id: string }) {
       <Link href="/interviews" className="mb-5 inline-flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-amber-300"><ArrowLeft className="h-4 w-4" />Interview pipeline</Link>
       <header className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <div className="mb-2 flex flex-wrap items-center gap-2"><InterviewStatusBadge status={interview.status} /><span className="text-xs font-semibold uppercase tracking-wider text-slate-500">{interviewLabel(interview.type)}{interview.roundNumber ? ` · Round ${interview.roundNumber}` : ""}</span></div>
+          <div className="mb-2 flex flex-wrap items-center gap-2"><InterviewStatusBadge status={interview.status} label={interviewStatusLabel(interview.status, stages)} /><span className="text-xs font-semibold uppercase tracking-wider text-slate-500">{interviewLabel(interview.type)}{interview.roundNumber ? ` · Round ${interview.roundNumber}` : ""}</span></div>
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{interview.role}</h1>
           <p className="mt-1 text-base text-slate-500">{interview.company}{interview.position ? ` · ${interview.position}` : ""}{interview.clientName ? ` · Client: ${interview.clientName}` : ""}</p>
         </div>
-        <div className="flex flex-wrap gap-2"><select aria-label="Interview status" value={interview.status} onChange={(event) => void updateStatus(event.target.value as InterviewStatus)} className="h-9 rounded-lg border border-slate-200 bg-[#182137] px-3 text-sm font-semibold">{INTERVIEW_STATUSES.map((status) => <option value={status} key={status}>{interviewLabel(status)}</option>)}</select><Button variant="secondary" onClick={() => setEditing(true)}><Edit3 className="h-4 w-4" />Edit</Button><Button variant="danger" onClick={() => void remove()}><Trash2 className="h-4 w-4" /></Button></div>
+        <div className="flex flex-wrap gap-2"><select aria-label="Interview status" value={interview.status} onChange={(event) => void updateStatus(event.target.value as InterviewStatus)} className="h-9 rounded-lg border border-slate-200 bg-[#182137] px-3 text-sm font-semibold">{stages.map((stage) => <option value={stage.id} key={stage.id}>{stage.label}</option>)}</select><Button variant="secondary" onClick={() => setEditing(true)}><Edit3 className="h-4 w-4" />Edit</Button><Button variant="danger" onClick={() => void remove()}><Trash2 className="h-4 w-4" /></Button></div>
       </header>
 
       <div className="grid gap-5 xl:grid-cols-[1.35fr_.65fr]">
@@ -103,11 +110,11 @@ export function InterviewDetail({ id }: { id: string }) {
 
         <div className="space-y-5">
           <Card className="overflow-hidden"><SectionTitle icon={<Contact />} title="People" /><div className="space-y-4 p-4 sm:p-5"><InfoList label="Interviewers" values={interview.interviewers} /><ContactLine label="Recruiter" value={interview.recruiterName} /><ContactLine label="Email" value={interview.recruiterEmail} href={interview.recruiterEmail ? `mailto:${interview.recruiterEmail}` : undefined} /><ContactLine label="Phone" value={interview.recruiterPhone} href={interview.recruiterPhone ? `tel:${interview.recruiterPhone}` : undefined} /></div></Card>
-          <Card className="overflow-hidden"><SectionTitle icon={<History />} title="Status history" /><div className="p-5">{[...interview.statusHistory].reverse().map((event, index) => <div key={`${event.changedAt}-${event.status}`} className="relative flex gap-3 pb-5 last:pb-0"><div className="relative z-10 mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-gradient-to-br from-amber-400 to-red-500 ring-4 ring-[#202a44]" />{index < interview.statusHistory.length - 1 && <div className="absolute bottom-0 left-[4px] top-3 w-px bg-slate-200" />}<div><p className="text-sm font-semibold text-ink">{interviewLabel(event.status)}</p><p className="mt-0.5 text-xs text-slate-500">{new Date(event.changedAt).toLocaleString()}</p></div></div>)}</div></Card>
+          <Card className="overflow-hidden"><SectionTitle icon={<History />} title="Status history" /><div className="p-5">{[...interview.statusHistory].reverse().map((event, index) => <div key={`${event.changedAt}-${event.status}`} className="relative flex gap-3 pb-5 last:pb-0"><div className="relative z-10 mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-gradient-to-br from-amber-400 to-red-500 ring-4 ring-[#202a44]" />{index < interview.statusHistory.length - 1 && <div className="absolute bottom-0 left-[4px] top-3 w-px bg-slate-200" />}<div><p className="text-sm font-semibold text-ink">{interviewStatusLabel(event.status, stages)}</p><p className="mt-0.5 text-xs text-slate-500">{new Date(event.changedAt).toLocaleString()}</p></div></div>)}</div></Card>
           <Card className="p-4 text-xs leading-5 text-slate-500"><MapPin className="mb-2 h-4 w-4 text-amber-300" />Created {new Date(interview.createdAt).toLocaleString()}<br />Last updated {new Date(interview.updatedAt).toLocaleString()}</Card>
         </div>
       </div>
-      {editing && <InterviewForm interview={interview} onClose={() => setEditing(false)} onSaved={(saved) => { setInterview(saved); setEditing(false); toast("Interview updated"); }} />}
+      {editing && <InterviewForm stages={stages} interview={interview} onClose={() => setEditing(false)} onSaved={(saved) => { setInterview(saved); setEditing(false); toast("Interview updated"); }} />}
     </div>
   );
 }

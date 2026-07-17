@@ -5,6 +5,15 @@ export async function getSettings(): Promise<AppSettings> {
   const { settings } = await collections();
   const current = await settings.findOne({});
   if (current) {
+    const interviewCustomStages = (current.interviewCustomStages ?? []).map((stage) => ({
+      ...stage,
+      description: stage.description ?? "Custom workflow step",
+      color: stage.color ?? "fuchsia",
+      custom: true as const,
+    }));
+    if (interviewCustomStages.some((stage, index) => stage.description !== current.interviewCustomStages?.[index]?.description || stage.color !== current.interviewCustomStages?.[index]?.color)) {
+      await settings.updateOne({ _id: current._id }, { $set: { interviewCustomStages } });
+    }
     if (!current.technologyCatalog?.length) {
       const technologyCatalog = DEFAULT_SETTINGS.technologyCatalog.map(
         (technology) => ({ ...technology, aliases: [...technology.aliases] }),
@@ -13,9 +22,9 @@ export async function getSettings(): Promise<AppSettings> {
         { _id: current._id },
         { $set: { technologyCatalog } },
       );
-      return { ...current, webAppUrl: current.webAppUrl ?? null, technologyCatalog };
+      return { ...current, webAppUrl: current.webAppUrl ?? null, technologyCatalog, interviewCustomStages };
     }
-    return { ...current, webAppUrl: current.webAppUrl ?? null };
+    return { ...current, webAppUrl: current.webAppUrl ?? null, interviewCustomStages };
   }
   const value: AppSettings = {
     ...DEFAULT_SETTINGS,
@@ -24,6 +33,6 @@ export async function getSettings(): Promise<AppSettings> {
       aliases: [...technology.aliases],
     })),
   };
-  await settings.insertOne(value);
-  return value;
+  const result = await settings.insertOne(value);
+  return { ...value, _id: result.insertedId };
 }

@@ -3,8 +3,8 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { BriefcaseBusiness, CalendarClock, Contact, FileText, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { INTERVIEW_STATUSES, INTERVIEW_TYPES, interviewLabel } from "@/lib/interviews/constants";
-import type { InterviewStatus, InterviewType, SerializedInterview } from "@/types/interview";
+import { CORE_INTERVIEW_STAGES, INTERVIEW_TYPES, interviewLabel } from "@/lib/interviews/constants";
+import type { InterviewPipelineStage, InterviewStatus, InterviewType, SerializedInterview } from "@/types/interview";
 
 interface JobOption {
   _id: string;
@@ -114,11 +114,13 @@ function fromInterview(value: SerializedInterview): FormState {
 
 export function InterviewForm({
   interview,
+  stages = CORE_INTERVIEW_STAGES,
   initialJobId,
   onClose,
   onSaved,
 }: {
   interview?: SerializedInterview | null;
+  stages?: InterviewPipelineStage[];
   initialJobId?: string | null;
   onClose: () => void;
   onSaved: (interview: SerializedInterview) => void;
@@ -239,7 +241,7 @@ export function InterviewForm({
 
           <Section icon={<CalendarClock className="h-4 w-4" />} title="Interview schedule">
             <Field label="Interview type" required><select value={form.type} onChange={(event) => set("type", event.target.value as InterviewType)} className={control}>{INTERVIEW_TYPES.map((type) => <option value={type} key={type}>{interviewLabel(type)}</option>)}</select></Field>
-            <Field label="Status" required><select value={form.status} onChange={(event) => set("status", event.target.value as InterviewStatus)} className={control}>{INTERVIEW_STATUSES.map((status) => <option value={status} key={status}>{interviewLabel(status)}</option>)}</select></Field>
+            <Field label="Status" required><select value={form.status} onChange={(event) => set("status", event.target.value as InterviewStatus)} className={control}>{stages.map((stage) => <option value={stage.id} key={stage.id}>{stage.label}</option>)}</select></Field>
             <Field label="Date and time"><input type="datetime-local" value={form.scheduledAt} onChange={(event) => set("scheduledAt", event.target.value)} className={control} /></Field>
             <Field label="Timezone"><input value={form.timezone} onChange={(event) => set("timezone", event.target.value)} className={control} /></Field>
             <Field label="Round"><input type="number" min="1" max="30" value={form.roundNumber} onChange={(event) => set("roundNumber", event.target.value)} className={control} /></Field>

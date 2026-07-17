@@ -1,5 +1,6 @@
 import type { ObjectId } from "mongodb";
 import type { TechnologyCategory } from "./job";
+import type { InterviewPipelineStage } from "./interview";
 
 export interface TechnologyCatalogItem {
   name: string;
@@ -16,6 +17,7 @@ export interface AppSettings {
   scrapingConcurrency: number;
   requestTimeoutMs: number;
   technologyCatalog: TechnologyCatalogItem[];
+  interviewCustomStages: InterviewPipelineStage[];
 }
 export interface AnalysisRun {
   _id?: ObjectId;
