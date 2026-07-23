@@ -248,7 +248,7 @@ export function InterviewsWorkspace({ initialJobId = null }: { initialJobId?: st
             <tbody className="divide-y divide-slate-200/70">
               {loading ? Array.from({ length: 5 }).map((_, index) => <tr key={index}>{Array.from({ length: 8 }).map((__, cell) => <td className="px-4 py-4" key={cell}><div className="skeleton h-5 rounded" /></td>)}</tr>) : result.interviews.map((interview) => (
                 <tr key={interview._id} className={`group transition-colors hover:brightness-110 ${stageRowClass(stages.find((stage) => stage.id === interview.status)?.color)}`}>
-                  <td className="whitespace-nowrap px-4 py-4"><div className="font-semibold text-ink">{formatDate(interview.scheduledAt)}</div><div className="mt-1 text-xs text-slate-500">{interview.durationMinutes ? `${interview.durationMinutes} min` : "Duration not set"}</div></td>
+                  <td className="whitespace-nowrap px-4 py-4"><div className="flex items-center gap-2"><div className="font-semibold text-ink">{formatDate(interview.scheduledAt)}</div>{isToday(interview.scheduledAt) && <TodayBadge />}</div><div className="mt-1 text-xs text-slate-500">{interview.durationMinutes ? `${interview.durationMinutes} min` : "Duration not set"}</div></td>
                   <td className="max-w-72 px-4 py-4"><Link href={`/interviews/${interview._id}`} className="block truncate font-bold text-ink hover:text-amber-300">{interview.role}</Link><div className="mt-1 truncate text-xs text-slate-500">{interview.company}{interview.position ? ` · ${interview.position}` : ""}</div></td>
                   <td className="px-4 py-4 text-sm text-slate-600">{interviewLabel(interview.type)}</td>
                   <td className="px-4 py-4 text-sm text-slate-500">{interview.roundNumber ? `#${interview.roundNumber}` : "—"}</td>
@@ -441,7 +441,7 @@ function PipelineCard({
           </Link>
           <p className="mt-0.5 truncate text-xs font-medium text-slate-500">{interview.company}</p>
         </div>
-        {interview.roundNumber && <span className="shrink-0 rounded-md bg-slate-100 px-1.5 py-1 text-[10px] font-bold text-slate-600">R{interview.roundNumber}</span>}
+        <div className="flex shrink-0 flex-col items-end gap-1.5">{isToday(interview.scheduledAt) && <TodayBadge />}{interview.roundNumber && <span className="rounded-md bg-slate-100 px-1.5 py-1 text-[10px] font-bold text-slate-600">R{interview.roundNumber}</span>}</div>
       </div>
       <div className="mt-3 h-1 overflow-hidden rounded-full bg-slate-100">
         <div className={`h-full rounded-full ${interview.status === "failed" ? "bg-red-400" : interview.status === "cancelled" ? "bg-slate-400" : "bg-gradient-to-r from-amber-400 to-orange-500"}`} style={{ width: `${progress}%` }} />
@@ -542,7 +542,18 @@ const pager = "grid h-8 w-8 place-items-center rounded-lg border border-slate-20
 
 function formatDate(value: string | null): string {
   if (!value) return "Not scheduled";
-  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(value));
+  return new Intl.DateTimeFormat(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(value));
+}
+
+function isToday(value: string | null): boolean {
+  if (!value) return false;
+  const date = new Date(value);
+  const today = new Date();
+  return date.getFullYear() === today.getFullYear() && date.getMonth() === today.getMonth() && date.getDate() === today.getDate();
+}
+
+function TodayBadge() {
+  return <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-300/50 bg-gradient-to-r from-amber-400/25 to-orange-500/25 px-2 py-1 text-[9px] font-black uppercase tracking-[.12em] text-amber-200 shadow-[0_0_14px_rgba(251,146,60,.2)]"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-300" />Today</span>;
 }
 
 function Metric({ icon, label, value, color }: { icon: React.ReactElement; label: string; value: number; color: "blue" | "amber" | "violet" | "green" }) {
