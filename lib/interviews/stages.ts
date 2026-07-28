@@ -4,7 +4,7 @@ import { getSettings } from "@/lib/mongodb/settings";
 
 export async function getInterviewStages(): Promise<InterviewPipelineStage[]> {
   const settings = await getSettings();
-  return allInterviewStages(settings.interviewCustomStages);
+  return allInterviewStages(settings.interviewCustomStages, settings.interviewStageOrder);
 }
 
 export async function assertInterviewStatus(status: InterviewStatus): Promise<void> {
