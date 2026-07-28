@@ -12,6 +12,7 @@ import {
   Clock3,
   Edit3,
   Eye,
+  GripVertical,
   List,
   Plus,
   Search,
@@ -58,6 +59,7 @@ export function InterviewsWorkspace({ initialJobId = null }: { initialJobId?: st
   const [showForm, setShowForm] = useState(Boolean(initialJobId));
   const [editing, setEditing] = useState<SerializedInterview | null>(null);
   const [stages, setStages] = useState<InterviewPipelineStage[]>(CORE_INTERVIEW_STAGES);
+  const [stagesReady, setStagesReady] = useState(false);
   const toast = useToast();
 
   const load = useCallback(async () => {
@@ -96,6 +98,7 @@ export function InterviewsWorkspace({ initialJobId = null }: { initialJobId?: st
         const data = (await response.json()) as { stages?: InterviewPipelineStage[]; error?: string };
         if (!response.ok) throw new Error(data.error ?? "Could not load interview stages");
         setStages(data.stages ?? CORE_INTERVIEW_STAGES);
+        setStagesReady(true);
       })
       .catch((error: Error) => toast(error.message, "error"));
   }, [toast]);
@@ -182,6 +185,26 @@ export function InterviewsWorkspace({ initialJobId = null }: { initialJobId?: st
     toast("Stage deleted");
   }
 
+  async function reorderStages(order: InterviewStatus[]) {
+    const previous = stages;
+    const next = order.flatMap((id) => stages.find((stage) => stage.id === id) ?? []);
+    setStages(next);
+    try {
+      const response = await fetch("/api/interview-stages", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ order }),
+      });
+      const data = (await response.json()) as { stages?: InterviewPipelineStage[]; error?: string };
+      if (!response.ok) throw new Error(data.error ?? "Could not reorder stages");
+      setStages(data.stages ?? next);
+      toast("Pipeline order saved");
+    } catch (error) {
+      setStages(previous);
+      toast(error instanceof Error ? error.message : "Could not reorder stages", "error");
+    }
+  }
+
   return (
     <div className="mx-auto max-w-[1700px] p-4 sm:p-6 lg:p-8">
       <header className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -233,6 +256,7 @@ export function InterviewsWorkspace({ initialJobId = null }: { initialJobId?: st
           <PipelineBoard
             interviews={result.interviews}
             stages={stages}
+            stagesReady={stagesReady}
             loading={loading}
             onStatus={changeStatus}
             onEdit={setEditing}
@@ -240,6 +264,7 @@ export function InterviewsWorkspace({ initialJobId = null }: { initialJobId?: st
             onAddStage={addStage}
             onUpdateStage={updateStage}
             onDeleteStage={deleteStage}
+            onReorderStages={reorderStages}
           />
         ) : (
         <div className="scrollbar overflow-x-auto">
@@ -297,6 +322,7 @@ const rowClasses: Record<InterviewStageColor, string> = {
 function PipelineBoard({
   interviews,
   stages,
+  stagesReady,
   loading,
   onStatus,
   onEdit,
@@ -304,9 +330,11 @@ function PipelineBoard({
   onAddStage,
   onUpdateStage,
   onDeleteStage,
+  onReorderStages,
 }: {
   interviews: SerializedInterview[];
   stages: InterviewPipelineStage[];
+  stagesReady: boolean;
   loading: boolean;
   onStatus: (interview: SerializedInterview, status: InterviewStatus) => Promise<void>;
   onEdit: (interview: SerializedInterview) => void;
@@ -314,14 +342,27 @@ function PipelineBoard({
   onAddStage: (details: StageDetails) => Promise<void>;
   onUpdateStage: (id: InterviewStatus, details: StageDetails) => Promise<void>;
   onDeleteStage: (id: InterviewStatus) => Promise<void>;
+  onReorderStages: (order: InterviewStatus[]) => Promise<void>;
 }) {
   const [addingStage, setAddingStage] = useState(false);
   const [stageName, setStageName] = useState("");
   const [stageDescription, setStageDescription] = useState("");
   const [stageColor, setStageColor] = useState<InterviewStageColor>("fuchsia");
   const [savingStage, setSavingStage] = useState(false);
-  function drop(event: DragEvent, status: InterviewStatus) {
+  const [draggedStage, setDraggedStage] = useState<InterviewStatus | null>(null);
+  function drop(event: DragEvent<HTMLElement>, status: InterviewStatus) {
     event.preventDefault();
+    const stageId = event.dataTransfer.getData("text/interview-stage-id") as InterviewStatus;
+    if (stageId && stageId !== status) {
+      const remaining = stages.map((stage) => stage.id).filter((id) => id !== stageId);
+      const targetIndex = remaining.indexOf(status);
+      const bounds = event.currentTarget.getBoundingClientRect();
+      const insertAfter = event.clientX > bounds.left + bounds.width / 2;
+      remaining.splice(targetIndex + (insertAfter ? 1 : 0), 0, stageId);
+      setDraggedStage(null);
+      void onReorderStages(remaining);
+      return;
+    }
     const interview = interviews.find(
       (item) => item._id === event.dataTransfer.getData("text/interview-id"),
     );
@@ -354,10 +395,26 @@ function PipelineBoard({
               key={stage.id}
               onDragOver={(event) => event.preventDefault()}
               onDrop={(event) => drop(event, stage.id)}
-              className="flex h-[min(680px,calc(100vh-22rem))] min-h-[390px] w-[285px] shrink-0 flex-col rounded-xl border border-slate-200 bg-[#182137]/70 p-3"
+              className={`flex h-[min(680px,calc(100vh-22rem))] min-h-[390px] w-[285px] shrink-0 flex-col rounded-xl border bg-[#182137]/70 p-3 transition ${draggedStage === stage.id ? "border-amber-400/50 opacity-50" : "border-slate-200"}`}
             >
               <header className="mb-3 flex shrink-0 items-center justify-between">
                 <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    draggable={stagesReady}
+                    disabled={!stagesReady}
+                    title={stagesReady ? `Drag ${stage.label} to reorder` : "Loading pipeline order"}
+                    aria-label={`Drag ${stage.label} to reorder`}
+                    onDragStart={(event) => {
+                      event.dataTransfer.effectAllowed = "move";
+                      event.dataTransfer.setData("text/interview-stage-id", stage.id);
+                      setDraggedStage(stage.id);
+                    }}
+                    onDragEnd={() => setDraggedStage(null)}
+                    className="grid h-7 w-5 shrink-0 cursor-grab place-items-center rounded text-slate-500 transition hover:bg-slate-100 hover:text-amber-300 active:cursor-grabbing disabled:cursor-wait disabled:opacity-40"
+                  >
+                    <GripVertical className="h-4 w-4" />
+                  </button>
                   <span className={`h-2.5 w-2.5 rounded-full ${accentClasses[stage.color]}`} />
                   <div>
                     <h3 className="text-xs font-bold text-ink">{stage.label}</h3>

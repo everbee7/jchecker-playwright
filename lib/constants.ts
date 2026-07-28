@@ -33,6 +33,7 @@ export const DEFAULT_SETTINGS = {
   requestTimeoutMs: 15000,
   technologyCatalog: DEFAULT_TECHNOLOGY_CATALOG,
   interviewCustomStages: [],
+  interviewStageOrder: [],
 };
 export const MAX_DESCRIPTION_LENGTH = 250_000;
 export const MAX_RESPONSE_BYTES = 5_000_000;

@@ -34,8 +34,12 @@ export const CORE_INTERVIEW_STAGES: InterviewPipelineStage[] = INTERVIEW_STATUSE
   custom: false,
 }));
 
-export function allInterviewStages(custom: InterviewPipelineStage[] = []): InterviewPipelineStage[] {
-  return [...CORE_INTERVIEW_STAGES, ...custom];
+export function allInterviewStages(custom: InterviewPipelineStage[] = [], order: InterviewStatus[] = []): InterviewPipelineStage[] {
+  const stages = [...CORE_INTERVIEW_STAGES, ...custom];
+  const byId = new Map(stages.map((stage) => [stage.id, stage]));
+  const ordered = order.flatMap((id) => byId.get(id) ? [byId.get(id)!] : []);
+  const included = new Set(ordered.map((stage) => stage.id));
+  return [...ordered, ...stages.filter((stage) => !included.has(stage.id))];
 }
 
 export function interviewStatusLabel(status: InterviewStatus, stages?: InterviewPipelineStage[]): string {
