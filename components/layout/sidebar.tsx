@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/ui";
 import packageInfo from "@/package.json";
-import { OpenWebLink } from "./open-web-link";
 const links = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/jobs", label: "Jobs", icon: BriefcaseBusiness },
@@ -57,7 +56,6 @@ export function Sidebar() {
         })}
       </nav>
       <div className="absolute bottom-6 left-4 right-4 z-10 hidden space-y-3 md:block">
-        <OpenWebLink />
         <div className="rounded-lg border border-white/10 bg-[#202a44]/80 p-3 text-xs leading-5 text-slate-400 backdrop-blur-sm">
           Paste messy job lists. Get clean, scored opportunities.
         </div>
