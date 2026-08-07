@@ -40,9 +40,9 @@ export async function getSettings(): Promise<AppSettings> {
         { _id: current._id, owner },
         { $set: { technologyCatalog } },
       );
-      return { ...current, webAppUrl: current.webAppUrl ?? null, technologyCatalog, interviewCustomStages, interviewStageOrder };
+      return { ...current, technologyCatalog, interviewCustomStages, interviewStageOrder };
     }
-    return { ...current, webAppUrl: current.webAppUrl ?? null, interviewCustomStages, interviewStageOrder };
+    return { ...current, interviewCustomStages, interviewStageOrder };
   }
   const value: AppSettings = {
     ...DEFAULT_SETTINGS,

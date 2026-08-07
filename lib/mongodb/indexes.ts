@@ -14,6 +14,10 @@ export function ensureIndexes() {
       legacySettings.updateMany({ owner: { $exists: false } }, { $set: { owner: LEGACY_DATA_OWNER } }),
       legacyRuns.updateMany({ owner: { $exists: false } }, { $set: { owner: LEGACY_DATA_OWNER } }),
       legacyInterviews.updateMany({ owner: { $exists: false } }, { $set: { owner: LEGACY_DATA_OWNER } }),
+      legacySettings.updateMany(
+        { webAppUrl: { $exists: true } },
+        { $unset: { webAppUrl: "" } },
+      ),
     ]);
     const legacyInterviewStatuses = [
       ["preparing", "scheduled"],

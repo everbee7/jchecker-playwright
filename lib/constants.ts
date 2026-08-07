@@ -26,7 +26,6 @@ export const DEFAULT_UNWANTED = [
   "Ruby on Rails",
 ];
 export const DEFAULT_SETTINGS = {
-  webAppUrl: null,
   wantedTechnologies: DEFAULT_WANTED,
   unwantedTechnologies: DEFAULT_UNWANTED,
   scrapingConcurrency: 3,

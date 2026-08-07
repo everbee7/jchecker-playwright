@@ -11,7 +11,6 @@ const allowedKeys = [
   "MONGODB_DB_NAME",
   "JOBCHECKER_USER",
   "user",
-  "JOBCHECKER_WEB_URL",
   "JOBCHECKER_DNS_SERVERS",
 ];
 

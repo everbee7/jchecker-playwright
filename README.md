@@ -76,8 +76,6 @@ Desktop builds stage the required values from the local `.env` into an ignored r
 
 The staging step also records the build machine's working non-loopback DNS resolvers. Electron applies them only if its Node runtime reports loopback-only DNS, which keeps MongoDB Atlas `mongodb+srv` discovery working without changing normal system DNS behavior.
 
-Set the Vercel production address under **Settings → Hosted web app**. The sidebar's **Open Web** action then opens it in the default browser. You can alternatively provide `JOBCHECKER_WEB_URL` in `JobChecker.env`; on Vercel, the deployment URL is detected automatically.
-
 For a Vercel deployment, configure `MONGODB_URI` with a network-accessible MongoDB deployment such as MongoDB Atlas. `mongodb://localhost:27017` only works for the local desktop application and cannot be reached by Vercel.
 
 For local Electron development using the existing production build, run:

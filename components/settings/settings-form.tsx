@@ -8,8 +8,6 @@ import {
   Settings2,
   Trash2,
   X,
-  Globe2,
-  ExternalLink,
 } from "lucide-react";
 import type { AppSettings } from "@/types/settings";
 import { DEFAULT_SETTINGS } from "@/lib/constants";
@@ -143,7 +141,6 @@ export function SettingsForm() {
     const data = (await response.json()) as { error?: string };
     setSaving(false);
     if (response.ok) {
-      window.dispatchEvent(new Event("jobchecker:web-url-updated"));
       toast("Settings saved");
     }
     else toast(data.error ?? "Could not save settings", "error");
@@ -158,42 +155,6 @@ export function SettingsForm() {
     );
   return (
     <div className="space-y-5">
-      <Card id="web-app" className="border-t-2 border-t-amber-500/80 p-5">
-        <div className="flex items-center gap-2 font-semibold">
-          <Globe2 className="h-4 w-4 text-amber-400" />
-          Hosted web app
-        </div>
-        <p className="mt-1 text-sm text-slate-500">
-          Connect the desktop sidebar to your Vercel production deployment.
-        </p>
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-          <input
-            type="url"
-            value={value.webAppUrl ?? ""}
-            onChange={(event) =>
-              setValue((current) => ({
-                ...current,
-                webAppUrl: event.target.value.trim() || null,
-              }))
-            }
-            placeholder="https://your-project.vercel.app"
-            className="h-10 min-w-0 flex-1 rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-amber-500"
-          />
-          {value.webAppUrl && (
-            <a
-              href={value.webAppUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-amber-400/30 px-4 text-sm font-semibold text-amber-300 transition hover:bg-amber-500/10"
-            >
-              Test URL <ExternalLink className="h-4 w-4" />
-            </a>
-          )}
-        </div>
-        <p className="mt-2 text-xs text-slate-400">
-          Save settings after changing this address. On Vercel itself, the production deployment URL is detected automatically.
-        </p>
-      </Card>
       <TechnologyCard
         title="Wanted technologies"
         description="These technologies increase a job’s match score."
