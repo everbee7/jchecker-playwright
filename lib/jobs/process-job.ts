@@ -16,11 +16,13 @@ export async function processJob(
 ): Promise<ObjectId> {
   await ensureIndexes();
   const { jobs } = await collections();
+  const owner = settings.owner;
   const normalizedUrl = normalizeUrl(url);
-  const existing = await jobs.findOne({ normalizedUrl });
+  const existing = await jobs.findOne({ owner, normalizedUrl });
   if (existing && !force) return existing._id!;
   const now = new Date();
   const base: Omit<JobDocument, "_id"> = {
+    owner,
     url,
     normalizedUrl,
     finalUrl: url,
@@ -62,7 +64,7 @@ export async function processJob(
     updatedAt: now,
   };
   const result = await jobs.findOneAndUpdate(
-    { normalizedUrl },
+    { owner, normalizedUrl },
     { $set: { ...base, createdAt: existing?.createdAt ?? now } },
     { upsert: true, returnDocument: "after" },
   );
@@ -84,12 +86,13 @@ export async function processJob(
     );
     const duplicate = await jobs.findOne({
       _id: { $ne: result._id },
+      owner,
       title: job.title,
       company: job.company,
       location: job.location,
     });
     await jobs.updateOne(
-      { _id: result._id },
+      { _id: result._id, owner },
       {
         $set: {
           ...job,
@@ -117,7 +120,7 @@ export async function processJob(
         ? error.httpStatus
         : null;
     await jobs.updateOne(
-      { _id: result._id },
+      { _id: result._id, owner },
       {
         $set: {
           scrapeStatus: "failed",

@@ -9,6 +9,7 @@ import {
 } from "@/lib/validation/schemas";
 import { z } from "zod";
 import { assertInterviewStatus } from "@/lib/interviews/stages";
+import { getDataOwner } from "@/lib/mongodb/tenant";
 
 async function idOf(params: Promise<{ id: string }>): Promise<ObjectId | null> {
   const { id } = await params;
@@ -22,8 +23,9 @@ export async function GET(
   try {
     const id = await idOf(params);
     if (!id) return Response.json({ error: "Invalid interview ID" }, { status: 400 });
+    const owner = getDataOwner();
     const { interviews } = await collections();
-    const interview = await interviews.findOne({ _id: id });
+    const interview = await interviews.findOne({ _id: id, owner });
     return interview
       ? Response.json(serializeInterview(interview))
       : Response.json({ error: "Interview not found" }, { status: 404 });
@@ -40,9 +42,10 @@ export async function PUT(
     const id = await idOf(params);
     if (!id) return Response.json({ error: "Invalid interview ID" }, { status: 400 });
     const input = interviewInputSchema.parse(await request.json());
+    const owner = getDataOwner();
     await assertInterviewStatus(input.status);
     const { interviews } = await collections();
-    const current = await interviews.findOne({ _id: id });
+    const current = await interviews.findOne({ _id: id, owner });
     if (!current) return Response.json({ error: "Interview not found" }, { status: 404 });
     const now = new Date();
     const statusHistory =
@@ -50,7 +53,7 @@ export async function PUT(
         ? current.statusHistory
         : [...current.statusHistory, { status: input.status, changedAt: now }];
     const interview = await interviews.findOneAndUpdate(
-      { _id: id },
+      { _id: id, owner },
       {
         $set: {
           ...interviewFields(input),
@@ -79,9 +82,10 @@ export async function PATCH(
       .object({ status: interviewStatusSchema })
       .parse(await request.json());
     await assertInterviewStatus(status);
+    const owner = getDataOwner();
     const now = new Date();
     const { interviews } = await collections();
-    const current = await interviews.findOne({ _id: id });
+    const current = await interviews.findOne({ _id: id, owner });
     if (!current) return Response.json({ error: "Interview not found" }, { status: 404 });
     const update =
       current.status === status
@@ -91,7 +95,7 @@ export async function PATCH(
             $push: { statusHistory: { status, changedAt: now } },
           };
     const interview = await interviews.findOneAndUpdate(
-      { _id: id },
+      { _id: id, owner },
       update,
       { returnDocument: "after" },
     );
@@ -110,8 +114,9 @@ export async function DELETE(
   try {
     const id = await idOf(params);
     if (!id) return Response.json({ error: "Invalid interview ID" }, { status: 400 });
+    const owner = getDataOwner();
     const { interviews } = await collections();
-    const result = await interviews.deleteOne({ _id: id });
+    const result = await interviews.deleteOne({ _id: id, owner });
     return Response.json({ deleted: result.deletedCount === 1 });
   } catch (error) {
     return apiError(error);

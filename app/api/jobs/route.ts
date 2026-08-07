@@ -4,6 +4,7 @@ import { collections } from "@/lib/mongodb/collections";
 import { ensureIndexes } from "@/lib/mongodb/indexes";
 import { serializeJob } from "@/lib/jobs/serialize";
 import { apiError } from "@/lib/validation/schemas";
+import { getDataOwner } from "@/lib/mongodb/tenant";
 const allowedSort: Record<string, string> = {
   score: "match.score",
   title: "title",
@@ -18,7 +19,8 @@ export async function GET(request: Request) {
     const query = new URL(request.url).searchParams;
     const page = Math.max(1, Number(query.get("page")) || 1);
     const limit = Math.min(100, Math.max(1, Number(query.get("limit")) || 25));
-    const filter: Filter<JobDocument> = {};
+    const owner = getDataOwner();
+    const filter: Filter<JobDocument> = { owner };
     const search = query.get("search")?.trim();
     if (search)
       filter.$or = [
@@ -78,8 +80,9 @@ export async function GET(request: Request) {
 }
 export async function DELETE() {
   try {
+    const owner = getDataOwner();
     const { jobs } = await collections();
-    const result = await jobs.deleteMany({});
+    const result = await jobs.deleteMany({ owner });
     return Response.json({ deletedCount: result.deletedCount });
   } catch (error) {
     return apiError(error);
