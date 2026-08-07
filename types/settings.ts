@@ -13,7 +13,6 @@ export interface TechnologyCatalogItem {
 export interface AppSettings {
   _id?: ObjectId;
   owner: string;
-  webAppUrl: string | null;
   wantedTechnologies: string[];
   unwantedTechnologies: string[];
   scrapingConcurrency: number;

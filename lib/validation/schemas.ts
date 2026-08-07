@@ -34,7 +34,6 @@ const interviewStageIdSchema = z.union([
   z.string().regex(/^custom-[a-z0-9][a-z0-9-]{0,79}$/),
 ]).transform((value) => value as InterviewStatus);
 export const settingsSchema = z.object({
-  webAppUrl: z.string().trim().url().max(500).nullable().optional().default(null),
   wantedTechnologies: z.array(z.string().trim().min(1).max(60)).max(100),
   unwantedTechnologies: z.array(z.string().trim().min(1).max(60)).max(100),
   scrapingConcurrency: z.number().int().min(1).max(10),
