@@ -1,3 +1,3 @@
-import { collections } from "@/lib/mongodb/collections";import { getSettings } from "@/lib/mongodb/settings";import { apiError,settingsSchema } from "@/lib/validation/schemas";
+import { collections } from "@/lib/mongodb/collections";import { getSettings } from "@/lib/mongodb/settings";import { getDataOwner } from "@/lib/mongodb/tenant";import { apiError,settingsSchema } from "@/lib/validation/schemas";
 export async function GET(){try{const settings=await getSettings();return Response.json({...settings,_id:settings._id?.toString()});}catch(error){return apiError(error);}}
-export async function PUT(request:Request){try{const value=settingsSchema.parse(await request.json());const {settings}=await collections();await settings.updateOne({},{$set:value},{upsert:true});return Response.json(value);}catch(error){return apiError(error);}}
+export async function PUT(request:Request){try{const value=settingsSchema.parse(await request.json());const owner=getDataOwner();const {settings}=await collections();await settings.updateOne({owner},{$set:{...value,owner}},{upsert:true});return Response.json({...value,owner});}catch(error){return apiError(error);}}

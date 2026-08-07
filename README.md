@@ -39,6 +39,7 @@ Next.js App Router, React, strict TypeScript, MongoDB's official Node.js driver,
    ```env
    MONGODB_URI=mongodb://localhost:27017
    MONGODB_DB_NAME=jobchecker
+   JOBCHECKER_USER=joseph
    ```
 
 4. Start MongoDB locally or provide a MongoDB Atlas connection string, then run:
@@ -48,6 +49,8 @@ Next.js App Router, React, strict TypeScript, MongoDB's official Node.js driver,
    ```
 
 Open `http://localhost:3000`. Collections and indexes are created on first use. The application uses `jobs`, `settings`, `analysis_runs`, and `interviews`.
+
+Multiple people can share the same MongoDB database by running separate app instances with different `JOBCHECKER_USER` values. The lowercase `user=joseph` form is also supported for existing environment files. The username is normalized to lowercase, the UI remains unchanged, and jobs, interviews, analysis runs, and settings are isolated by owner. Existing records without an owner are assigned to `joseph` automatically.
 
 For a production check and server:
 

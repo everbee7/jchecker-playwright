@@ -2,9 +2,17 @@ import { DEFAULT_SETTINGS } from "@/lib/constants";
 import type { AppSettings } from "@/types/settings";
 import { collections } from "./collections";
 import { allInterviewStages } from "@/lib/interviews/constants";
+import { ensureIndexes } from "./indexes";
+import { getDataOwner, LEGACY_DATA_OWNER } from "./tenant";
 export async function getSettings(): Promise<AppSettings> {
+  await ensureIndexes();
   const { settings } = await collections();
-  const current = await settings.findOne({});
+  const owner = getDataOwner();
+  await settings.updateMany(
+    { owner: { $exists: false } },
+    { $set: { owner: LEGACY_DATA_OWNER } },
+  );
+  const current = await settings.findOne({ owner });
   if (current) {
     const interviewCustomStages = (current.interviewCustomStages ?? []).map((stage) => ({
       ...stage,
@@ -22,14 +30,14 @@ export async function getSettings(): Promise<AppSettings> {
     const customStagesChanged = interviewCustomStages.some((stage, index) => stage.description !== current.interviewCustomStages?.[index]?.description || stage.color !== current.interviewCustomStages?.[index]?.color);
     const orderChanged = interviewStageOrder.length !== savedOrder.length || interviewStageOrder.some((id, index) => id !== savedOrder[index]);
     if (customStagesChanged || orderChanged) {
-      await settings.updateOne({ _id: current._id }, { $set: { interviewCustomStages, interviewStageOrder } });
+      await settings.updateOne({ _id: current._id, owner }, { $set: { interviewCustomStages, interviewStageOrder } });
     }
     if (!current.technologyCatalog?.length) {
       const technologyCatalog = DEFAULT_SETTINGS.technologyCatalog.map(
         (technology) => ({ ...technology, aliases: [...technology.aliases] }),
       );
       await settings.updateOne(
-        { _id: current._id },
+        { _id: current._id, owner },
         { $set: { technologyCatalog } },
       );
       return { ...current, webAppUrl: current.webAppUrl ?? null, technologyCatalog, interviewCustomStages, interviewStageOrder };
@@ -38,11 +46,19 @@ export async function getSettings(): Promise<AppSettings> {
   }
   const value: AppSettings = {
     ...DEFAULT_SETTINGS,
+    owner,
     technologyCatalog: DEFAULT_SETTINGS.technologyCatalog.map((technology) => ({
       ...technology,
       aliases: [...technology.aliases],
     })),
   };
-  const result = await settings.insertOne(value);
-  return { ...value, _id: result.insertedId };
+  const created = await settings.findOneAndUpdate(
+    { owner },
+    { $setOnInsert: value },
+    { upsert: true, returnDocument: "after" },
+  );
+  if (!created) {
+    throw new Error(`Unable to initialize settings for ${owner}`);
+  }
+  return created;
 }
