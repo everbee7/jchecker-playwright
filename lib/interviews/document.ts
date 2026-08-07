@@ -7,7 +7,7 @@ type InterviewInput = z.infer<typeof interviewInputSchema>;
 
 export function interviewFields(
   input: InterviewInput,
-): Omit<InterviewDocument, "_id" | "statusHistory" | "createdAt" | "updatedAt"> {
+): Omit<InterviewDocument, "_id" | "owner" | "statusHistory" | "createdAt" | "updatedAt"> {
   return {
     ...input,
     linkedJobId: input.linkedJobId ? new ObjectId(input.linkedJobId) : null,

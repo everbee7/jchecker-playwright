@@ -47,6 +47,7 @@ export interface JobRequirements {
 }
 export interface JobDocument {
   _id?: ObjectId;
+  owner: string;
   url: string;
   normalizedUrl: string;
   finalUrl: string;

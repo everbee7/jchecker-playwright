@@ -6,6 +6,7 @@ import { interviewFields } from "@/lib/interviews/document";
 import { serializeInterview } from "@/lib/interviews/serialize";
 import { apiError, interviewInputSchema } from "@/lib/validation/schemas";
 import { assertInterviewStatus } from "@/lib/interviews/stages";
+import { getDataOwner } from "@/lib/mongodb/tenant";
 
 const terminalStatuses = ["offer", "cancelled", "failed"] as const;
 const sortFields: Record<string, keyof InterviewDocument> = {
@@ -25,7 +26,8 @@ export async function GET(request: Request) {
     const query = new URL(request.url).searchParams;
     const page = Math.max(1, Number(query.get("page")) || 1);
     const limit = Math.min(100, Math.max(1, Number(query.get("limit")) || 30));
-    const filter: Filter<InterviewDocument> = {};
+    const owner = getDataOwner();
+    const filter: Filter<InterviewDocument> = { owner };
     const search = query.get("search")?.trim();
     if (search) {
       const pattern = { $regex: escaped(search), $options: "i" };
@@ -57,13 +59,14 @@ export async function GET(request: Request) {
         .limit(limit)
         .toArray(),
       interviews.countDocuments(filter),
-      interviews.countDocuments(),
+      interviews.countDocuments({ owner }),
       interviews.countDocuments({
+        owner,
         scheduledAt: { $gte: now },
         status: { $nin: [...terminalStatuses] },
       }),
-      interviews.countDocuments({ status: "awaiting-feedback" }),
-      interviews.countDocuments({ status: "offer" }),
+      interviews.countDocuments({ owner, status: "awaiting-feedback" }),
+      interviews.countDocuments({ owner, status: "offer" }),
     ]);
     return Response.json({
       interviews: items.map(serializeInterview),
@@ -81,9 +84,11 @@ export async function POST(request: Request) {
   try {
     await ensureIndexes();
     const input = interviewInputSchema.parse(await request.json());
+    const owner = getDataOwner();
     await assertInterviewStatus(input.status);
     const now = new Date();
     const document: InterviewDocument = {
+      owner,
       ...interviewFields(input),
       statusHistory: [{ status: input.status, changedAt: now }],
       createdAt: now,

@@ -12,6 +12,7 @@ export interface TechnologyCatalogItem {
 
 export interface AppSettings {
   _id?: ObjectId;
+  owner: string;
   webAppUrl: string | null;
   wantedTechnologies: string[];
   unwantedTechnologies: string[];
@@ -23,6 +24,7 @@ export interface AppSettings {
 }
 export interface AnalysisRun {
   _id?: ObjectId;
+  owner: string;
   totalLinks: number;
   completedCount: number;
   failedCount: number;

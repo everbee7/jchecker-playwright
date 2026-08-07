@@ -19,7 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/toast";
 import type { TechnologyCategory } from "@/types/job";
 import type { TechnologyCatalogItem } from "@/types/settings";
-type Editable = Omit<AppSettings, "_id">;
+type Editable = Omit<AppSettings, "_id" | "owner">;
 export function SettingsForm() {
   const [value, setValue] = useState<Editable>({ ...DEFAULT_SETTINGS });
   const [loading, setLoading] = useState(true);

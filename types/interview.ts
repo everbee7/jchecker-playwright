@@ -50,6 +50,7 @@ export interface InterviewStatusEvent {
 
 export interface InterviewDocument {
   _id?: ObjectId;
+  owner: string;
   linkedJobId: ObjectId | null;
   jobUrl: string | null;
   company: string;

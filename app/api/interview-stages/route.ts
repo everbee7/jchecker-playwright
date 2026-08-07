@@ -37,7 +37,7 @@ export async function POST(request: Request) {
     const stage = { id: `custom-${slug}-${randomUUID().slice(0, 6)}` as const, label, description, color, custom: true as const };
     const { settings } = await collections();
     await settings.updateOne(
-      { _id: current._id },
+      { _id: current._id, owner: current.owner },
       { $push: { interviewCustomStages: stage, interviewStageOrder: stage.id } },
     );
     return Response.json(stage, { status: 201 });
@@ -55,7 +55,7 @@ export async function PATCH(request: Request) {
     }
     const { settings } = await collections();
     const result = await settings.updateOne(
-      { _id: current._id, "interviewCustomStages.id": input.id },
+      { _id: current._id, owner: current.owner, "interviewCustomStages.id": input.id },
       { $set: {
         "interviewCustomStages.$.label": input.label,
         "interviewCustomStages.$.description": input.description,
@@ -81,7 +81,10 @@ export async function PUT(request: Request) {
       return Response.json({ error: "Stage order must include every current interview stage exactly once" }, { status: 400 });
     }
     const { settings } = await collections();
-    await settings.updateOne({ _id: current._id }, { $set: { interviewStageOrder: order } });
+    await settings.updateOne(
+      { _id: current._id, owner: current.owner },
+      { $set: { interviewStageOrder: order } },
+    );
     return Response.json({ stages: allInterviewStages(current.interviewCustomStages, order) });
   } catch (error) {
     return apiError(error);
@@ -91,11 +94,15 @@ export async function PUT(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const id = idSchema.parse(new URL(request.url).searchParams.get("id")) as InterviewStatus;
+    const current = await getSettings();
     const { interviews, settings } = await collections();
-    if (await interviews.countDocuments({ status: id })) {
+    if (await interviews.countDocuments({ owner: current.owner, status: id })) {
       return Response.json({ error: "Move interviews out of this stage before deleting it" }, { status: 409 });
     }
-    const result = await settings.updateOne({}, { $pull: { interviewCustomStages: { id }, interviewStageOrder: id } });
+    const result = await settings.updateOne(
+      { _id: current._id, owner: current.owner },
+      { $pull: { interviewCustomStages: { id }, interviewStageOrder: id } },
+    );
     return result.modifiedCount
       ? Response.json({ deleted: true })
       : Response.json({ error: "Custom stage not found" }, { status: 404 });
